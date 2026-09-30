@@ -56,7 +56,6 @@ const markPair = (x: number, y: number, w: number, h: number, color: number): Ma
   { x: -x, y, w, h, color },
   { x, y, w, h, color },
 ];
-const feet = (color = FOOT_YELLOW) => pair(0.18, (x) => ({ c: [x, 0.05, 0.18], r: [0.13, 0.06, 0.15], color }));
 
 /** 땅이: 따뜻한 흰색 오리, 위는 좁고 아래가 넓은 종 모양, 크고 납작한 부리, 반짝이는 눈 */
 const WHITE = 0xf6f5f0;
@@ -107,25 +106,29 @@ export const ddamong: CharacterSpec = {
   ],
 };
 
-/** 시바: 주황 등 + 하얀 얼굴·배, 감은 눈, 혀, 눈썹 점 */
+/** 시바: 엎드린 식빵 모양 인형. 주황 등 + 하얀 볼·배, 동그란 점 눈, 하얀 눈썹 점, 삼각 귀, 등 위 말린 꼬리 */
 const ORANGE = 0xe89a3a;
-const CREAM = 0xfbf5ea;
+const CREAM = 0xfdf8ef;
+const EAR_INNER = 0xf4d9b0;
+const EYE_BROWN = 0x3a2a20;
 export const shiba: CharacterSpec = {
   blobs: [
-    ...feet(ORANGE),
-    { c: [0, 0.48, 0], r: [0.44, 0.48, 0.37], color: ORANGE, round: 2.6 },
-    { c: [0, 0.4, 0.08], r: [0.36, 0.38, 0.3], color: CREAM, round: 2.6 }, // 하얀 얼굴·배
-    { c: [0, 0.56, 0.36], r: [0.14, 0.08, 0.08], color: CREAM }, // 주둥이
-    ...pair(0.25, (x) => ({ c: [x, 0.9, 0], r: [0.11, 0.11, 0.07], color: ORANGE })), // 귀
-    ...pair(0.42, (x) => ({ c: [x, 0.36, 0.12], r: [0.08, 0.12, 0.08], color: ORANGE })), // 앞발
-    { c: [0.14, 0.5, -0.38], r: [0.11, 0.11, 0.1], color: CREAM }, // 말린 꼬리
+    { c: [0, 0.44, -0.04], r: [0.47, 0.44, 0.5], color: ORANGE, taper: 0.08, round: 2.6 }, // 머리까지 한 덩어리, 앞뒤로 긴 식빵 몸
+    { c: [0, 0.31, 0.15], r: [0.43, 0.31, 0.36], color: CREAM, round: 2.4 }, // 하얀 볼·배 (얼굴 아래 절반)
+    { c: [0, 0.5, 0.42], r: [0.12, 0.08, 0.07], color: CREAM }, // 작은 주둥이
+    ...pair(0.28, (x) => ({ c: [x, 0.84, 0.14], r: [0.12, 0.11, 0.07], color: ORANGE, taper: 0.45 })), // 삼각 귀
+    ...pair(0.28, (x) => ({ c: [x, 0.83, 0.18], r: [0.07, 0.07, 0.04], color: EAR_INNER, taper: 0.45 })), // 귀 안쪽
+    ...pair(0.2, (x) => ({ c: [x, 0.07, 0.38], r: [0.11, 0.07, 0.11], color: ORANGE })), // 앞으로 삐죽 나온 앞발
+    ...pair(0.3, (x) => ({ c: [x, 0.08, -0.42], r: [0.1, 0.07, 0.1], color: ORANGE })), // 뒷발
+    { c: [0, 0.64, -0.5], r: [0.13, 0.13, 0.1], color: ORANGE }, // 등 위 말린 꼬리
+    { c: [0.05, 0.69, -0.56], r: [0.06, 0.06, 0.05], color: CREAM }, // 꼬리 끝
   ],
   marks: [
-    ...markPair(0.15, 0.68, 0.12, 0.03, BLACK), // 감은 눈
-    { x: 0, y: 0.6, w: 0.08, h: 0.05, color: BLACK }, // 코
-    { x: 0, y: 0.49, w: 0.07, h: 0.05, color: 0xef7f8f }, // 혀
-    ...markPair(0.26, 0.56, 0.1, 0.06, BLUSH),
-    ...markPair(0.14, 0.83, 0.06, 0.05, CREAM), // 눈썹 점
+    ...markPair(0.15, 0.63, 0.055, 0.065, EYE_BROWN), // 동그란 점 눈
+    ...markPair(0.15, 0.75, 0.075, 0.045, CREAM), // 하얀 눈썹 점
+    { x: 0, y: 0.55, w: 0.075, h: 0.045, color: EYE_BROWN }, // 코
+    ...markPair(0.03, 0.47, 0.045, 0.014, EYE_BROWN), // ω 입
+    ...markPair(0.26, 0.36, 0.11, 0.065, BLUSH), // 하얀 볼 위 분홍 볼터치
   ],
 };
 
