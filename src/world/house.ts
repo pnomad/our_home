@@ -63,6 +63,15 @@ export interface Rack {
   front: THREE.Vector3; // 건조대 앞 바닥
 }
 
+/** 거실 테이블 위 라디오: 켜면 음표가 올라가고 인형들이 앞에 모여 춤춤 */
+export interface Radio {
+  pos: THREE.Vector3; // 라디오 위치 (테이블 위)
+  setOn(on: boolean): void;
+  /** 매 프레임: 켜져 있으면 음표 · 들썩들썩 */
+  update(t: number, dt: number): void;
+  danceSpots: THREE.Vector3[]; // 테이블 앞 바닥, 카메라 쪽을 보고 춤추는 자리
+}
+
 /** 사각 구역 + 높이 */
 export interface Area {
   x0: number;
@@ -82,6 +91,7 @@ export interface House {
   frontDoor: FrontDoor;
   washer: Washer;
   rack: Rack;
+  radio: Radio;
   bed: Area; // 잘 자기 버튼이 뜨는 곳
   /** (x, z)에서 밟을 수 있는 가장 높은 면의 높이. 벽·집 밖은 Infinity */
   heightAt(x: number, z: number): number;
@@ -223,6 +233,85 @@ export function createHouse(): House {
   rug.position.set(-1.5, 0.01, -0.5);
   rug.receiveShadow = true;
   group.add(rug);
+  // 거실 테이블 (소파 앞 러그 위, 낮은 원목 테이블) + 라디오
+  const TABLE = { x0: 0.4, x1: 2.8, z0: -1.3, z1: 0.1, top: 1.2 };
+  box([TABLE.x0, TABLE.x1], [TABLE.top - 0.15, TABLE.top], [TABLE.z0, TABLE.z1], 0xc79a6b); // 상판
+  solids.push({ ...TABLE });
+  for (const [lx, lz] of [[TABLE.x0 + 0.1, TABLE.z0 + 0.1], [TABLE.x1 - 0.3, TABLE.z0 + 0.1], [TABLE.x0 + 0.1, TABLE.z1 - 0.3], [TABLE.x1 - 0.3, TABLE.z1 - 0.3]]) {
+    box([lx, lx + 0.2], [0, TABLE.top - 0.15], [lz, lz + 0.2], 0xb3875a, false);
+  }
+  const radioPos = new THREE.Vector3((TABLE.x0 + TABLE.x1) / 2, TABLE.top, (TABLE.z0 + TABLE.z1) / 2);
+  const radioGroup = new THREE.Group(); // 앞(+z)을 보는 레트로 라디오
+  radioGroup.position.copy(radioPos);
+  group.add(radioGroup);
+  const rpart = (geo: THREE.BufferGeometry, color: number, p: [number, number, number], rot?: [number, number, number]) => {
+    const m = new THREE.Mesh(geo, mat(color));
+    m.position.set(...p);
+    if (rot) m.rotation.set(...rot);
+    m.castShadow = true;
+    radioGroup.add(m);
+    return m;
+  };
+  rpart(new THREE.BoxGeometry(1.2, 0.72, 0.46), 0x8fcfc2, [0, 0.36, 0]); // 민트색 몸통
+  rpart(new THREE.BoxGeometry(1.08, 0.6, 0.02), 0xf6ecd6, [0, 0.36, 0.235]); // 크림색 앞판
+  rpart(new THREE.CircleGeometry(0.22, 24), 0x6b5a4a, [-0.27, 0.34, 0.25]); // 스피커
+  for (const r of [0.16, 0.1]) rpart(new THREE.RingGeometry(r - 0.012, r, 24), 0x9c8a74, [-0.27, 0.34, 0.255]);
+  rpart(new THREE.BoxGeometry(0.42, 0.14, 0.02), 0xfff8e6, [0.24, 0.47, 0.25]); // 주파수 창
+  rpart(new THREE.BoxGeometry(0.02, 0.12, 0.01), 0xe0503c, [0.2, 0.47, 0.262]); // 바늘
+  for (const x of [0.13, 0.35]) rpart(new THREE.CylinderGeometry(0.07, 0.07, 0.06, 16), 0xb07b4f, [x, 0.22, 0.26], [Math.PI / 2, 0, 0]); // 다이얼
+  rpart(new THREE.TorusGeometry(0.34, 0.035, 8, 20, Math.PI), 0x6b5a4a, [0, 0.72, 0]); // 손잡이
+  rpart(new THREE.CylinderGeometry(0.015, 0.015, 0.9, 6), 0xb8c0c6, [0.45, 1.1, -0.1], [0, 0, -0.35]); // 안테나
+  const lampMat = new THREE.MeshBasicMaterial({ color: 0x7a6a5a });
+  const lamp = new THREE.Mesh(new THREE.SphereGeometry(0.04, 10, 8), lampMat); // 전원등
+  lamp.position.set(0.5, 0.22, 0.25);
+  radioGroup.add(lamp);
+  // 음표 (켜져 있으면 스피커에서 둥실둥실)
+  const noteTex = ['♪', '♫'].map((ch) => {
+    const c = document.createElement('canvas');
+    c.width = c.height = 64;
+    const g = c.getContext('2d')!;
+    g.font = 'bold 52px sans-serif';
+    g.textAlign = 'center';
+    g.textBaseline = 'middle';
+    g.lineWidth = 6;
+    g.strokeStyle = '#fffaf0';
+    g.strokeText(ch, 32, 34);
+    g.fillStyle = '#e0763c';
+    g.fillText(ch, 32, 34);
+    return new THREE.CanvasTexture(c);
+  });
+  const notes = Array.from({ length: 6 }, (_, i) => {
+    const sp = new THREE.Sprite(new THREE.SpriteMaterial({ map: noteTex[i % 2], transparent: true, depthWrite: false }));
+    sp.scale.set(0.35, 0.35, 1);
+    sp.visible = false;
+    sp.userData.offset = i / 6;
+    sp.userData.side = i % 2 ? 1 : -1;
+    group.add(sp);
+    return sp;
+  });
+  let radioOn = false;
+  const radio: Radio = {
+    pos: radioPos,
+    danceSpots: [-2.3, -0.4, 1.5, 3.4].map((x) => new THREE.Vector3(x, 0, 1.7)), // 이름표가 겹치지 않을 만큼 띄움
+    setOn(on) {
+      radioOn = on;
+      lampMat.color.set(on ? 0xffc23d : 0x7a6a5a);
+      for (const n of notes) n.visible = on;
+      if (!on) radioGroup.scale.set(1, 1, 1);
+    },
+    update(t) {
+      if (!radioOn) return;
+      // 박자(1초에 2.1번)에 맞춰 들썩
+      const beat = Math.abs(Math.sin(t * 2.1 * Math.PI));
+      radioGroup.scale.set(1 + beat * 0.04, 1 + beat * 0.06, 1 + beat * 0.04);
+      for (const n of notes) {
+        const k = (t * 0.45 + n.userData.offset) % 1; // 0 → 1 올라가며 사라짐
+        n.position.set(radioPos.x - 0.27 + n.userData.side * (0.25 + k * 0.5) + Math.sin(k * 9) * 0.1, radioPos.y + 0.7 + k * 1.8, radioPos.z + 0.3);
+        n.material.opacity = k < 0.15 ? k / 0.15 : 1 - (k - 0.15) / 0.85;
+      }
+    },
+  };
+
   // TV (왼쪽 벽 쪽, 오른쪽을 바라봄)
   box([-6.75, -5.6], [0, 1.6], [-2, 0.6], 0xc8a57e);
   box([-6.6, -6.2], [1.6, 4.2], [-1.8, 0.4], 0x3a3a44);
@@ -517,6 +606,7 @@ export function createHouse(): House {
     heightAt,
     setSunbeam,
     updateFade,
+    radio,
     fridge: { setOpen, light, tray, trayHome, front: new THREE.Vector3(21.25, 0, -2.0) },
     frontDoor: {
       setOpen: (k: number) => (frontDoorPivot.rotation.y = 1.7 * k),

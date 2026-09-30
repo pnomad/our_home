@@ -22,7 +22,7 @@ npm run build      # tsc 타입 검사 + 빌드. 테스트 코드는 없음 → 
 | `?zoom=0.4` | 카메라 줌 |
 | characters.html `?angle=0.5` | 도감 회전 고정 (라디안) |
 
-개발 모드에선 브라우저 콘솔에 `__game` 이 있다: `__game.goToSleep()`, `__game.talkTo(__game.villagers[0])`, `__game.doLaundry()`, `__game.clock.update(60)`(게임 시간 60분 앞당김) 등.
+개발 모드에선 브라우저 콘솔에 `__game` 이 있다: `__game.goToSleep()`, `__game.talkTo(__game.villagers[0])`, `__game.doLaundry()`, `__game.setRadio(true)`, `__game.clock.update(60)`(게임 시간 60분 앞당김) 등.
 
 화면으로 확인할 때는 Playwright(크로미움)로 위 주소를 열고, 대화창은 스페이스 키로 넘기면서 스크린샷을 찍으면 된다. `goToSleep()` 처럼 연출이 끝나야 끝나는 함수는 `page.evaluate` 에서 await 하지 말 것 (대화를 넘길 수 없어서 멈춤).
 
@@ -35,11 +35,12 @@ npm run build      # tsc 타입 검사 + 빌드. 테스트 코드는 없음 → 
   - `shapeSpecs.ts` 캐릭터 설계도(덩어리 + 얼굴 무늬). `plushStyle.ts`·`voxelStyle.ts` 가 이걸 그림, `models.ts` 는 블록 스타일
   - `meltStyle.ts` 덩어리를 녹여 붙인 한 겹 표면 (지금은 고양이·쓰레기봉지만 사용)
   - `dirt.ts` 꼬질꼬질 흙먼지 얼룩 붙이기/떼기
+  - `dance.ts` 라디오 춤 (땅이 땅댄스 = 날개 쫙 벌리고 몸만 흔들기, 나머지는 각자 흔들흔들). 팔은 설계도 덩어리의 `part: 'armL' | 'armR'` 로 따로 움직임
 - `src/events/` — 밤 이벤트. `common.ts` 에 잠들기·다음 날 아침·연출 도구(tween, hop, walk)
   - `fridgeRaid.ts` 냉장고 털기: 시바→감자→따몽→땅이 탑 쌓기 → 와르르 → 만두 몰래 먹기
   - `catFight.ts` 고양이 소동: 대문 앞 쓰레기봉지 뒤지는 고양이와 한판 → 꼬질꼬질
   - `laundry.ts` 씻는 날: 빨래망 → 드럼세탁기 → 빨래건조대에서 말리기
-- `src/world/` — `house.ts` 집·가구(인형 키 1칸 기준, 전부 축 정렬 상자), `places.ts` 주민 이동 지도, `clock.ts` 게임 시계(하루 = 실제 20분, 날짜는 localStorage), `lighting.ts`
+- `src/world/` — `house.ts` 집·가구(인형 키 1칸 기준, 전부 축 정렬 상자, 거실 테이블 위 라디오), `places.ts` 주민 이동 지도, `clock.ts` 게임 시계(하루 = 실제 20분, 날짜는 localStorage), `lighting.ts`, `radioMusic.ts` 라디오 노래(126 BPM, 파일 없이 브라우저에서 합성)
 - `src/ui/` — 대화창, 암전, 시계, 시작 화면
 
 집 좌표: x -21~23 (침실 · 거실 · 부엌 순), z -6(뒷벽)~6(앞, 벽 없음), y 위. 캐릭터는 +z 를 앞으로 본다.

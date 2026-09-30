@@ -2,6 +2,7 @@
 //   ☀️ 오전 10시~오후 4시: 침대에 들어오는 햇빛에 벌러덩 누워 빠삭~
 //   낮잠, 집 안 돌아다니기, 형제 찾아가서 싸움 / 장난 / 같이 낮잠 / 수다
 //   밤 10시 이후: 침대나 소파에서 잠
+//   📻 라디오가 켜져 있으면: 다 같이 거실 테이블 앞에 모여 춤
 import * as THREE from 'three';
 import { Villager, rand } from './villager';
 import { HANGOUTS, randomSpot, type PlaceId } from '../world/places';
@@ -12,6 +13,8 @@ export interface LifeContext {
   clock: GameClock;
   villagers: Villager[];
   heightAt(x: number, z: number): number;
+  /** 라디오 앞 춤추는 자리 (인형 수만큼, 거실 바닥) */
+  danceSpots: THREE.Vector3[];
 }
 
 const SUN_START = 10 * 60;
@@ -66,6 +69,7 @@ export function createLife(ctx: LifeContext) {
   };
   /** 테스트용: 다음에 할 일 예약 */
   const queued = new Map<Villager, () => Promise<void>>();
+  let radioOn = false;
 
   // ---------- 혼자 하는 일 ----------
 
@@ -74,6 +78,7 @@ export function createLife(ctx: LifeContext) {
     await v.goTo(place);
     v.activity = 'wander';
     for (let i = 0; i < rounds; i++) {
+      if (radioOn) return; // 폴짝 중이라 라디오 소리를 못 끊었으면 여기서 춤추러
       await v.walkTo(spot(place));
       if (Math.random() < 0.3) v.say(pick(v.info.bubbles.idle));
       await v.wait(rand(1.5, 4));
@@ -83,6 +88,7 @@ export function createLife(ctx: LifeContext) {
   async function nap(v: Villager, place: PlaceId, sec = rand(20, 45)) {
     v.activity = 'travel';
     await v.goTo(place);
+    if (radioOn) return;
     await v.walkTo(spot(place, v));
     v.activity = 'nap';
     v.setPose('lieSide');
@@ -94,6 +100,7 @@ export function createLife(ctx: LifeContext) {
   async function sunbathe(v: Villager) {
     v.activity = 'travel';
     await v.goTo('bed');
+    if (radioOn) return;
     await v.walkTo(spot('bed', v));
     await sunbatheHere(v);
   }
@@ -112,13 +119,33 @@ export function createLife(ctx: LifeContext) {
     v.setPose('stand');
   }
 
+  /** 라디오 앞 제자리로 가서 라디오가 꺼질 때까지 춤 */
+  async function danceParty(v: Villager) {
+    v.activity = 'travel';
+    await v.goTo('living', 1.8); // 노래 나오면 신나서 뛰어옴
+    const spot = ctx.danceSpots[villagers.indexOf(v) % ctx.danceSpots.length];
+    await v.walkTo(spot, v.info.walkSpeed * 1.8);
+    v.char.root.rotation.y = 0; // 카메라 쪽을 보고
+    v.activity = 'dance';
+    v.dancing = true;
+    try {
+      while (radioOn) {
+        await v.wait(rand(3, 6));
+        if (radioOn && Math.random() < 0.35) v.say(pick(v.info.bubbles.dance), 2);
+      }
+    } finally {
+      v.dancing = false;
+      v.setPose('stand');
+    }
+  }
+
   // ---------- 형제와 어울리기 ----------
 
   /** a 가 b 에게 가서 (도착했을 때 b 가 그대로면) 뭔가 함 */
   async function visit(a: Villager, b: Villager) {
     a.activity = 'travel';
     await a.goTo(b.place);
-    if (a.engaged) return; // 가는 사이에 다른 형제가 먼저 붙잡음 → 그쪽 연출을 따름
+    if (a.engaged || radioOn) return; // 가는 사이에 다른 형제가 먼저 붙잡음 → 그쪽 연출을 따름
     if (a.place !== b.place || !available(b) || !available(a) || a.position.distanceTo(b.position) > 6) {
       note(`${a.info.name} → ${b.info.name} 찾아갔는데 없음 (${b.info.name}@${b.place})`);
       await hangOut(a, a.place, 1);
@@ -273,6 +300,10 @@ export function createLife(ctx: LifeContext) {
       await plan0();
       return;
     }
+    if (radioOn) {
+      await danceParty(v);
+      return;
+    }
     const m = clock.minutes;
     const likes = v.info.likes;
     const others = villagers.filter((o) => o !== v && available(o));
@@ -308,6 +339,16 @@ export function createLife(ctx: LifeContext) {
     },
     start() {
       for (const v of villagers) v.live(next);
+    },
+    get radioOn() {
+      return radioOn;
+    },
+    /** 라디오 켜기/끄기: 하던 일을 멈추고 춤추러 가거나, 춤을 멈추고 평소대로 */
+    setRadio(on: boolean) {
+      radioOn = on;
+      for (const v of villagers) {
+        if (on ? available(v) || v.isSleeping : v.dancing || v.activity === 'travel') v.interrupt();
+      }
     },
   };
 }

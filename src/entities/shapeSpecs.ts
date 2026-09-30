@@ -11,7 +11,13 @@ export interface Blob {
   taper?: number;
   /** 네모난 정도 (2 = 매끈한 타원/계란, 3 = 어깨가 빵빵한 찐빵, 클수록 네모) */
   round?: number;
+  /** 따로 움직이는 팔 (어깨를 축으로 돌릴 수 있게 따로 그림. 춤출 때 사용) */
+  part?: ArmName;
 }
+
+export type ArmName = 'armL' | 'armR';
+/** 팔 덩어리의 어깨 (돌리는 축) = 덩어리 윗부분 */
+export const shoulderOf = (b: Blob): [number, number, number] => [b.c[0], b.c[1] + b.r[1] * 0.75, b.c[2]];
 
 /** 높이 y에서 가로·깊이 배율 (taper 반영) */
 export function taperScale(b: Blob, y: number) {
@@ -63,7 +69,7 @@ export const ddangi: CharacterSpec = {
   blobs: [
     ...pair(0.2, (x) => ({ c: [x, 0.05, 0.3], r: [0.11, 0.07, 0.13], color: FOOT_YELLOW })), // 앞으로 나온 발
     { c: [0, 0.5, 0], r: [0.43, 0.55, 0.38], color: WHITE, taper: 0.12, round: 2.7 }, // 위는 살짝 좁고 어깨가 빵빵한 몸
-    ...pair(0.44, (x) => ({ c: [x, 0.42, 0], r: [0.07, 0.18, 0.16], color: WHITE })), // 몸에 붙은 날개
+    ...pair(0.44, (x) => ({ c: [x, 0.42, 0], r: [0.07, 0.18, 0.16], color: WHITE, part: x < 0 ? 'armL' : 'armR' })), // 몸에 붙은 날개 (춤출 때 쫙 벌림)
     { c: [0, 0.7, 0.37], r: [0.14, 0.07, 0.1], color: 0xf2b233 }, // 크고 납작한 부리
   ],
   marks: [

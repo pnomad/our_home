@@ -40,6 +40,16 @@ function face(parent: THREE.Object3D, w: number, h: number, x: number, y: number
   return box(parent, [w, h, 0.02], [x, y, front + 0.01], color);
 }
 
+/** 팔 메쉬를 어깨(shoulderY 높이)를 축으로 돌릴 수 있는 그룹으로 감쌈 (춤출 때 사용) */
+function arm(parent: THREE.Object3D, name: 'armL' | 'armR', mesh: THREE.Mesh, shoulderY: number) {
+  const pivot = new THREE.Group();
+  pivot.name = name;
+  pivot.position.set(mesh.position.x, shoulderY, mesh.position.z);
+  mesh.position.sub(pivot.position);
+  pivot.add(mesh);
+  parent.add(pivot);
+}
+
 export interface Character {
   root: THREE.Group; // 위치·회전용
   body: THREE.Group; // 통통 튀는 애니메이션용
@@ -78,8 +88,8 @@ export function createDdangi() {
     soft(b, [0.26, 0.12, 0.3], [0.2, 0.06, 0.14], FOOT_YELLOW, 0.05);
     soft(b, [0.88, 0.6, 0.66], [0, 0.34, 0], WHITE, 0.28); // 통통한 아랫배 (앞면은 몸과 맞춰 이음새 없게)
     soft(b, [0.74, 1.08, 0.66], [0, 0.6, 0], WHITE, 0.3); // 머리까지 이어진 몸
-    soft(b, [0.14, 0.4, 0.28], [-0.47, 0.42, 0], WHITE, 0.07); // 늘어진 날개
-    soft(b, [0.14, 0.4, 0.28], [0.47, 0.42, 0], WHITE, 0.07);
+    arm(b, 'armL', soft(b, [0.14, 0.4, 0.28], [-0.47, 0.42, 0], WHITE, 0.07), 0.58); // 늘어진 날개 (춤출 때 쫙 벌림)
+    arm(b, 'armR', soft(b, [0.14, 0.4, 0.28], [0.47, 0.42, 0], WHITE, 0.07), 0.58);
     soft(b, [0.3, 0.16, 0.18], [0, 0.8, 0.38], BEAK, 0.07); // 부리
     const f = 0.33;
     face(b, 0.08, 0.1, -0.19, 0.9, f, BLACK); // 눈

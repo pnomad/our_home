@@ -6,6 +6,7 @@ import type { Character } from './models';
 import type { VillagerInfo } from '../data/villagers';
 import type { Zone } from '../world/house';
 import { findPath, nearestPlace, PLACES, type PlaceId } from '../world/places';
+import { applyDance, setArms } from './dance';
 
 export const rand = (a: number, b: number) => a + Math.random() * (b - a);
 
@@ -76,7 +77,7 @@ export class Interrupt extends Error {}
 class Abort extends Error {}
 
 type Pose = 'stand' | 'lieSide' | 'lieBack';
-export type Activity = 'idle' | 'wander' | 'travel' | 'nap' | 'sunbathe' | 'fight' | 'prank' | 'chat' | 'napTogether';
+export type Activity = 'idle' | 'wander' | 'travel' | 'nap' | 'sunbathe' | 'fight' | 'prank' | 'chat' | 'napTogether' | 'dance';
 
 /** 최근에 한 일 (대사에 쓰임) */
 export interface Memory {
@@ -114,6 +115,8 @@ export class Villager {
   scripted = false;
   /** 빨래 뒤 건조대에서 마르는 중 (움직이지 않지만 말은 걸 수 있음) */
   drying = false;
+  /** 라디오 듣고 춤추는 중 (몸 흔들기는 update 에서) */
+  dancing = false;
   walking = false;
   airborne = false;
   zzz = createZzz();
@@ -262,16 +265,17 @@ export class Villager {
     }
   }
 
-  /** 장소까지 길 찾아 이동 (문 지나고, 가구는 폴짝) */
-  async goTo(target: PlaceId) {
+  /** 장소까지 길 찾아 이동 (문 지나고, 가구는 폴짝). hurry 배만큼 빨리 걸음 */
+  async goTo(target: PlaceId, hurry = 1) {
+    const speed = this.info.walkSpeed * hurry;
     const here = PLACES[this.place];
     // 먼저 지금 장소의 기준점으로 (같은 높이일 때만)
     if (target !== this.place && Math.abs(here.p.y - this.position.y) < 0.05 && this.position.distanceTo(here.p) > 0.2) {
-      await this.walkTo(here.p);
+      await this.walkTo(here.p, speed);
     }
     for (const id of findPath(this.place, target)) {
       const p = PLACES[id].p;
-      if (Math.abs(p.y - this.position.y) < 0.05) await this.walkTo(p);
+      if (Math.abs(p.y - this.position.y) < 0.05) await this.walkTo(p, speed);
       else {
         await this.hopTo(p);
         await this.stepAside();
@@ -298,6 +302,8 @@ export class Villager {
   setPose(pose: Pose) {
     this.pose = pose;
     this.char.body.rotation.set(pose === 'lieBack' ? -Math.PI / 2 : 0, 0, pose === 'lieSide' ? Math.PI / 2 : 0);
+    this.char.body.position.x = 0;
+    setArms(this.char, 0);
     this.zzz.visible = false;
   }
 
@@ -398,7 +404,9 @@ export class Villager {
 
     // 몸 애니메이션: 걷기 통통 / 서서 숨쉬기 / 누워서 천천히 숨쉬기
     const lying = this.pose !== 'stand';
-    if (this.walking) {
+    if (this.dancing && !this.walking && !this.talking) {
+      applyDance(this.info.id, this.char, t + this.phase * 0.02);
+    } else if (this.walking) {
       this.walkTime += dt;
       body.position.y = Math.abs(Math.sin(this.walkTime * this.info.walkSpeed * 7)) * 0.08;
       body.scale.set(1, 1, 1);

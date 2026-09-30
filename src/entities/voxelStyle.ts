@@ -1,15 +1,32 @@
 // 복셀 스타일: 설계도를 작은 큐브들로 채워서 그린다 (크로시 로드 느낌).
 import * as THREE from 'three';
 import { makeCharacter } from './models';
-import { insideBlob, type CharacterSpec } from './shapeSpecs';
+import { insideBlob, shoulderOf, type Blob, type CharacterSpec, type Mark } from './shapeSpecs';
 
 const VOXEL = 0.1;
 
 export function buildVoxel(spec: CharacterSpec) {
+  return makeCharacter((b) => {
+    b.add(voxelMesh(spec.blobs.filter((bl) => !bl.part), spec.marks));
+    // 팔: 따로 큐브로 채워서 어깨를 축으로 돌릴 수 있게
+    for (const blob of spec.blobs.filter((bl) => bl.part)) {
+      const pivot = new THREE.Group();
+      pivot.name = blob.part!;
+      pivot.position.set(...shoulderOf(blob));
+      const mesh = voxelMesh([blob], []);
+      mesh.position.sub(pivot.position);
+      pivot.add(mesh);
+      b.add(pivot);
+    }
+  });
+}
+
+/** 덩어리들을 같은 격자의 큐브로 채운 메쉬 */
+function voxelMesh(blobs: Blob[], marks: Mark[]) {
   // 1) 격자 범위
   const min = [Infinity, Infinity, Infinity];
   const max = [-Infinity, -Infinity, -Infinity];
-  for (const { c, r } of spec.blobs) {
+  for (const { c, r } of blobs) {
     for (let a = 0; a < 3; a++) {
       min[a] = Math.min(min[a], Math.floor((c[a] - r[a]) / VOXEL));
       max[a] = Math.max(max[a], Math.ceil((c[a] + r[a]) / VOXEL));
@@ -24,7 +41,7 @@ export function buildVoxel(spec: CharacterSpec) {
     for (let j = min[1]; j <= max[1]; j++) {
       for (let k = min[2]; k <= max[2]; k++) {
         const p = [(i + 0.5) * VOXEL, (j + 0.5) * VOXEL, (k + 0.5) * VOXEL];
-        for (const b of spec.blobs) {
+        for (const b of blobs) {
           if (insideBlob(b, p[0], p[1], p[2])) grid.set(key(i, j, k), b.color);
         }
       }
@@ -39,7 +56,7 @@ export function buildVoxel(spec: CharacterSpec) {
     if (hi < lo) lo = hi = Math.round(center / VOXEL - 0.5);
     return [lo, hi];
   };
-  for (const m of spec.marks) {
+  for (const m of marks) {
     const [i0, i1] = cells(m.x, m.w);
     const [j0, j1] = cells(m.y, m.h);
     for (let i = i0; i <= i1; i++) {
@@ -77,5 +94,5 @@ export function buildVoxel(spec: CharacterSpec) {
     mesh.setColorAt(n, col.setHex(color));
   });
   mesh.castShadow = true;
-  return makeCharacter((b) => b.add(mesh));
+  return mesh;
 }

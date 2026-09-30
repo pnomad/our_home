@@ -16,6 +16,7 @@ import { runCatFight } from './events/catFight';
 import { runLaundry, finishDrying } from './events/laundry';
 import { runQuietNight, NARRATOR, type EventContext } from './events/common';
 import { getMoveInput } from './input';
+import { createRadioMusic } from './world/radioMusic';
 
 const PLAYER_SPEED = 4; // 칸/초
 const PLAYER_RADIUS = 0.3;
@@ -108,7 +109,7 @@ const villagers = ids.map((id) => {
   return v;
 });
 // 주민들이 알아서 돌아다니며 빠삭·낮잠·싸움·장난을 시작
-const life = createLife({ clock, villagers, heightAt: house.heightAt });
+const life = createLife({ clock, villagers, heightAt: house.heightAt, danceSpots: house.radio.danceSpots });
 life.start();
 
 // ---------- 대화 ----------
@@ -174,6 +175,7 @@ function nextTalk(v: Villager): { talk: Talk; friend?: string } {
     return { talk: v.info.afterCatFight };
   }
   if (v.drying) return { talk: v.info.drying };
+  if (v.activity === 'dance') return { talk: v.info.dance };
   if (washed && !heardAfterWash.has(v.info.id)) {
     heardAfterWash.add(v.info.id);
     return { talk: v.info.afterWash };
@@ -208,6 +210,23 @@ async function talkTo(v: Villager | null) {
   if (readyToWash() && heardCatFight.has(v.info.id) && talk === v.info.afterCatFight) {
     await dialogue.play(NARRATOR, [{ pages: ['다들 흙먼지 투성이다…', '오늘은 씻는 날! 🫧', '(부엌 세탁기 앞에서 빨래를 할 수 있어요)'] }]);
   }
+}
+
+// ---------- 📻 라디오: 켜면 인형들이 테이블 앞에 모여 춤 ----------
+const music = createRadioMusic();
+
+function nearRadio() {
+  const p = player.root.position;
+  const r = house.radio.pos;
+  return Math.hypot(p.x - r.x, p.z - r.z) < 2.8; // 테이블 가장자리 어디서든
+}
+
+function setRadio(on: boolean) {
+  if (life.radioOn === on) return;
+  life.setRadio(on);
+  house.radio.setOn(on);
+  if (on) music.start();
+  else music.stop();
 }
 
 /** 네 명 모두에게 고양이 이야기를 들었으면 빨래 가능 */
@@ -295,6 +314,7 @@ function pickNightEvent(): NightEvent {
 async function sleepAndRaid() {
   cutscene = true;
   actionButton.show(null);
+  setRadio(false); // 잘 때는 라디오 끔
   if (dryUntil >= 0) await dryDone(true); // 건조대에 널린 채로 밤이 되면 그냥 다 마른 걸로
   const night = pickNightEvent();
   const ctx = eventContext();
@@ -319,6 +339,9 @@ function currentAction(): { label: string; run: () => void } | null {
   if (near) return { label: `💬 ${near.info.name}에게 말 걸기`, run: () => talkTo(near) };
   if (onBed()) return { label: '🛏️ 잘 자기', run: () => goToSleep() };
   if (readyToWash() && nearWasher()) return { label: '🧺 빨래하기', run: () => doLaundry() };
+  if (nearRadio()) return life.radioOn
+    ? { label: '📻 라디오 끄기', run: () => setRadio(false) }
+    : { label: '📻 라디오 켜기', run: () => setRadio(true) };
   return null;
 }
 
@@ -419,6 +442,7 @@ function update(dt: number, t: number) {
   snapCamera = false;
   camera.lookAt(camera.position.x, camera.position.y - offset.y + 0.5, camera.position.z - offset.z);
   house.updateFade(camera.position, focus, dt);
+  house.radio.update(t, dt);
   sun.position.set(focus.x + 8, 15, focus.z + 6);
   sun.target.position.set(focus.x, 0, focus.z);
 }
@@ -436,7 +460,7 @@ function hitsVillager(x: number, z: number) {
 }
 
 // 개발 중 브라우저 콘솔에서 테스트용 (예: __game.talkTo(__game.villagers[0]))
-if (import.meta.env.DEV) Object.assign(window, { __game: { player, villagers, talkTo, dialogue, update, jump, goToSleep, clock, life, doLaundry } });
+if (import.meta.env.DEV) Object.assign(window, { __game: { player, villagers, talkTo, dialogue, update, jump, goToSleep, clock, life, doLaundry, setRadio } });
 
 camera.position.set(THREE.MathUtils.clamp(player.root.position.x, -15, 17), 0, Math.min(player.root.position.z, 0.5)).add(CAMERA_OFFSET.clone().multiplyScalar(zoom));
 tick();

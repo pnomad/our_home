@@ -26,7 +26,7 @@ export const PLACES: Record<PlaceId, Place> = Object.fromEntries(
     P('bed', -16, 1.6, -1.3, { area: { x0: -18.8, x1: -13.8, z0: -3.8, z1: -1.0 }, soft: true }),
     P('doorBL', -7, 0, 2.75),
     // 거실
-    P('living', -0.5, 0, 2, { area: { x0: -5, x1: 4.5, z0: 0.4, z1: 5.2 } }),
+    P('living', -0.5, 0, 3.4, { area: { x0: -5, x1: 4.5, z0: 0.4, z1: 5.2 } }), // 테이블 앞 춤추는 줄(z 1.7)과 안 겹치게
     P('sofaFront', -1.5, 0, -0.6),
     P('sofa', -1.5, 1.5, -3.0, { area: { x0: -4, x1: 1, z0: -4.6, z1: -2.9 }, soft: true }),
     P('deskFront', 8.7, 0, -0.8),

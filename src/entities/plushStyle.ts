@@ -1,7 +1,7 @@
 // 말랑 인형 스타일: 설계도의 덩어리를 매끈한 곡면으로 그린다.
 import * as THREE from 'three';
 import { mat, makeCharacter } from './models';
-import { blobNormal, frontSurface, type CharacterSpec } from './shapeSpecs';
+import { blobNormal, frontSurface, shoulderOf, type CharacterSpec } from './shapeSpecs';
 
 const sphere = new THREE.SphereGeometry(1, 28, 20);
 
@@ -34,7 +34,17 @@ export function buildPlush(spec: CharacterSpec) {
       m.position.set(...blob.c);
       m.scale.set(...blob.r);
       m.castShadow = true;
-      b.add(m);
+      if (blob.part) {
+        // 팔: 어깨를 축으로 돌릴 수 있게 그룹으로 감쌈
+        const pivot = new THREE.Group();
+        pivot.name = blob.part;
+        pivot.position.set(...shoulderOf(blob));
+        m.position.sub(pivot.position);
+        pivot.add(m);
+        b.add(pivot);
+      } else {
+        b.add(m);
+      }
     }
     // 무늬: 얇은 원판을 표면 기울기에 맞춰 붙임
     for (const mark of spec.marks) {
