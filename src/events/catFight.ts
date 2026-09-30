@@ -4,7 +4,7 @@
 import * as THREE from 'three';
 import type { Character } from '../entities/models';
 import { BLACK } from '../entities/models';
-import { buildPlush } from '../entities/plushStyle';
+import { buildMelted } from '../entities/meltStyle';
 import { setDirty } from '../entities/dirt';
 import type { CharacterSpec } from '../entities/shapeSpecs';
 import type { VillagerId } from '../entities/styles';
@@ -13,7 +13,7 @@ import { fallAsleep, wakeUp, sayer, tween, face, hop, walk, wait, frame, type Ev
 
 const CAT_SPEAKER: Speaker = { name: '고양이', order: '동네', color: '#8b8f98' };
 
-/** 동네 고양이: 회색 줄무늬, 인형보다 훨씬 큼 */
+/** 동네 고양이: 회색 줄무늬, 인형보다 훨씬 큼. 덩어리를 녹여 붙여 한 몸으로 */
 function createCat(): Character {
   const GREY = 0x9a9ca3;
   const DARK = 0x6e7079;
@@ -21,12 +21,12 @@ function createCat(): Character {
   const pair = (x: number, make: (x: number) => CharacterSpec['blobs'][number]) => [make(-x), make(x)];
   const spec: CharacterSpec = {
     blobs: [
-      ...pair(0.15, (x) => ({ c: [x, 0.14, 0.3], r: [0.08, 0.15, 0.08], color: GREY })), // 앞다리
-      ...pair(0.16, (x) => ({ c: [x, 0.14, -0.42], r: [0.09, 0.15, 0.09], color: GREY })), // 뒷다리
+      ...pair(0.15, (x) => ({ c: [x, 0.15, 0.3], r: [0.095, 0.16, 0.095], color: GREY })), // 앞다리
+      ...pair(0.16, (x) => ({ c: [x, 0.15, -0.42], r: [0.1, 0.16, 0.1], color: GREY })), // 뒷다리
       { c: [0, 0.46, -0.08], r: [0.28, 0.25, 0.52], color: GREY }, // 몸
       { c: [0, 0.4, 0.12], r: [0.2, 0.18, 0.3], color: WHITE }, // 하얀 가슴
       { c: [0, 0.74, 0.42], r: [0.29, 0.25, 0.24], color: GREY }, // 머리
-      ...pair(0.17, (x) => ({ c: [x, 0.98, 0.42], r: [0.09, 0.11, 0.05], color: GREY, taper: 0.8 })), // 뾰족 귀
+      ...pair(0.17, (x) => ({ c: [x, 1.0, 0.42], r: [0.1, 0.14, 0.05], color: GREY, taper: 0.8 })), // 뾰족 귀
       { c: [0, 0.66, 0.62], r: [0.11, 0.07, 0.06], color: WHITE }, // 주둥이
       { c: [0, 0.78, -0.66], r: [0.06, 0.3, 0.06], color: DARK }, // 번쩍 든 꼬리
     ],
@@ -41,7 +41,7 @@ function createCat(): Character {
       { x: 0.07, y: 0.92, w: 0.025, h: 0.06, color: DARK },
     ],
   };
-  const cat = buildPlush(spec);
+  const cat = buildMelted(spec, { melt: 0.09 });
   cat.root.scale.setScalar(1.7);
   return cat;
 }

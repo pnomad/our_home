@@ -2,6 +2,7 @@
 // 앞쪽 벽은 없는 인형의 집 구조. 가구는 전부 축에 맞춘 상자(Solid)라서 높이 계산이 간단하다.
 import * as THREE from 'three';
 import type { VillagerId } from '../entities/styles';
+import { meltedGeometry } from '../entities/meltStyle';
 
 /** 걷기만 해도 저절로 폴짝 올라가는 높이 (책 한 권, 문턱 정도) */
 export const HOP_HEIGHT = 0.6;
@@ -348,17 +349,21 @@ export function createHouse(): House {
   const porchLight = new THREE.PointLight(0xffd99a, 0, 12, 1.2);
   porchLight.position.set(24.4, FRONT_DOOR.h + 0.4, -1.3);
   group.add(porchLight);
-  // 쓰레기봉지 (반투명 흰 종량제 봉투) + 뜯기면 흩어지는 쓰레기
+  // 쓰레기봉지 (반투명 흰 종량제 봉투): 봉투 + 묶은 목 + 토끼귀 매듭을 녹여 붙인 한 덩어리
   const bag = new THREE.Group();
   bag.position.set(25.6, 0, -0.4);
-  const bagMat = new THREE.MeshLambertMaterial({ color: 0xf1efe4, transparent: true, opacity: 0.92 });
-  const bagBody = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), bagMat);
-  bagBody.scale.set(0.95, 1.05, 0.85);
-  bagBody.position.y = 0.95;
+  const BAG = 0xf1efe4;
+  const bagBody = new THREE.Mesh(
+    meltedGeometry([
+      { c: [0, 0.9, 0], r: [0.95, 0.9, 0.85], color: BAG, round: 2.3, taper: 0.12 }, // 불룩한 봉투
+      { c: [0, 1.85, 0], r: [0.18, 0.2, 0.18], color: BAG }, // 묶은 목
+      { c: [-0.17, 2.12, 0], r: [0.1, 0.2, 0.07], color: BAG, taper: 0.35 }, // 매듭 귀
+      { c: [0.17, 2.12, 0], r: [0.1, 0.2, 0.07], color: BAG, taper: 0.35 },
+    ], { melt: 0.22, cell: 0.05 }),
+    new THREE.MeshLambertMaterial({ vertexColors: true, transparent: true, opacity: 0.94 }),
+  );
   bagBody.castShadow = true;
-  const bagKnot = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.5, 10), bagMat);
-  bagKnot.position.y = 2.1;
-  bag.add(bagBody, bagKnot);
+  bag.add(bagBody);
   group.add(bag);
   const trash: [THREE.Mesh, THREE.Vector3][] = [];
   const addTrash = (geo: THREE.BufferGeometry, color: number, to: [number, number, number], rotZ = 0) => {
@@ -379,11 +384,8 @@ export function createHouse(): House {
   addTrash(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 12), 0xc8d0d6, [27.6, 0.18, 0.2], Math.PI / 2); // 빈 캔
   addTrash(new THREE.BoxGeometry(0.7, 0.05, 0.5), 0xe7d3a8, [25.2, 0.03, 1.6]); // 과자 봉지
   addTrash(new THREE.BoxGeometry(0.12, 0.05, 0.6), 0xd9d2c0, [26.3, 0.03, -2.0]); // 생선 가시
-  const bagHome = bagBody.scale.clone();
   const setTorn = (k: number) => {
-    bagBody.scale.set(bagHome.x * (1 + 0.1 * k), bagHome.y * (1 - 0.45 * k), bagHome.z * (1 + 0.1 * k));
-    bagBody.position.y = 0.95 * (1 - 0.45 * k);
-    bagKnot.position.y = 2.1 - 1.0 * k;
+    bagBody.scale.set(1 + 0.12 * k, 1 - 0.5 * k, 1 + 0.12 * k); // 뜯겨서 푹 주저앉음
     for (const [m, to] of trash) {
       m.visible = k > 0;
       m.position.lerpVectors(new THREE.Vector3(25.6, 0.9, -0.4), to, k);
