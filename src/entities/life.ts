@@ -5,7 +5,7 @@
 import * as THREE from 'three';
 import { Villager, rand } from './villager';
 import { HANGOUTS, randomSpot, type PlaceId } from '../world/places';
-import { pick } from '../data/villagers';
+import { pick, CHATS } from '../data/villagers';
 import type { GameClock } from '../world/clock';
 
 export interface LifeContext {
@@ -118,6 +118,7 @@ export function createLife(ctx: LifeContext) {
   async function visit(a: Villager, b: Villager) {
     a.activity = 'travel';
     await a.goTo(b.place);
+    if (a.engaged) return; // 가는 사이에 다른 형제가 먼저 붙잡음 → 그쪽 연출을 따름
     if (a.place !== b.place || !available(b) || !available(a) || a.position.distanceTo(b.position) > 6) {
       note(`${a.info.name} → ${b.info.name} 찾아갔는데 없음 (${b.info.name}@${b.place})`);
       await hangOut(a, a.place, 1);
@@ -183,16 +184,20 @@ export function createLife(ctx: LifeContext) {
     b.setPose('stand');
     await approach(a, b, 0.9);
     faceEachOther(a, b);
+    // a 가 따지고 → b 가 받아치고 → 서로 한마디씩
     for (let i = 0; i < 4; i++) {
       const [x, y] = i % 2 ? [b, a] : [a, b];
-      x.say(pick(x.info.bubbles.fight), 1.4);
+      const lines = i === 0 ? x.info.bubbles.fightStart : i === 1 ? x.info.bubbles.fightBack : x.info.bubbles.fight;
+      // 붙어 서 있어서 말풍선이 겹치지 않게, 앞사람 말풍선이 사라진 뒤에 받아침
+      x.say(pick(lines), 1.5);
       await bump(x, y);
-      await x.wait(0.5);
+      await x.wait(1.25);
     }
     // 한 명이 삐져서 돌아섬
     const [loser, winner] = Math.random() < 0.5 ? [a, b] : [b, a];
-    loser.say('흥!', 2);
+    loser.say('흥!', 1.5);
     loser.char.root.rotation.y += Math.PI;
+    await a.wait(1.6);
     winner.say(pick(winner.info.bubbles.fight), 2);
     await a.wait(2);
     a.remember('fight', now(), b);
@@ -243,10 +248,14 @@ export function createLife(ctx: LifeContext) {
     b.setPose('stand');
     await approach(a, b, 1.0);
     faceEachOther(a, b);
-    for (let i = 0; i < 4; i++) {
-      const x = i % 2 ? b : a;
-      x.say(pick(x.info.bubbles.chat), 1.8);
-      await a.wait(1.9);
+    // 짝끼리 주고받는 대본이 있으면 그대로, 없으면 번갈아 한마디씩
+    const scripts = CHATS.filter((c) => c.pair.includes(a.info.id) && c.pair.includes(b.info.id));
+    const lines: [Villager, string][] = scripts.length
+      ? pick(scripts).lines.map(([id, text]) => [id === a.info.id ? a : b, text])
+      : [0, 1, 2, 3].map((i) => (i % 2 ? [b, pick(b.info.bubbles.chat)] : [a, pick(a.info.bubbles.chat)]));
+    for (const [x, text] of lines) {
+      x.say(text, 2.3);
+      await a.wait(2.4);
     }
     a.remember('chat', now(), b);
     b.remember('chat', now(), a);

@@ -418,6 +418,7 @@ function update(dt: number, t: number) {
   else camera.position.lerp(camTarget, Math.min(1, dt * (cameraOverride ? 2.5 : 5)));
   snapCamera = false;
   camera.lookAt(camera.position.x, camera.position.y - offset.y + 0.5, camera.position.z - offset.z);
+  house.updateFade(camera.position, focus, dt);
   sun.position.set(focus.x + 8, 15, focus.z + 6);
   sun.target.position.set(focus.x, 0, focus.z);
 }

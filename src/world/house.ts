@@ -76,6 +76,8 @@ export interface House {
   group: THREE.Group;
   /** 침실 창문으로 들어와 침대를 비추는 햇빛 (0 = 없음, 1 = 가장 밝음) */
   setSunbeam(k: number): void;
+  /** 카메라와 보려는 곳 사이를 가리는 가구(세탁기)를 반투명하게. 매 프레임 */
+  updateFade(camera: THREE.Vector3, focus: THREE.Vector3, dt: number): void;
   fridge: Fridge;
   frontDoor: FrontDoor;
   washer: Washer;
@@ -427,6 +429,37 @@ export function createHouse(): House {
   const setWasherOpen = (k: number) => {
     washerDoor.rotation.y = -1.9 * k;
   };
+  // 세탁기가 카메라와 보려는 곳 사이를 가리면 반투명해짐 (냉장고 앞 연출, 세로로 긴 폰 화면)
+  const washerBox = new THREE.Box3(new THREE.Vector3(20.5, 0, 2.6), new THREE.Vector3(22.9, 3.1, 5.2));
+  let washerAlpha = 1;
+  const ray = new THREE.Ray();
+  const hit = new THREE.Vector3();
+  const blocks = (from: THREE.Vector3, to: THREE.Vector3) => {
+    const dist = from.distanceTo(to);
+    ray.set(from, to.clone().sub(from).normalize());
+    return !!ray.intersectBox(washerBox, hit) && from.distanceTo(hit) < dist - 0.1;
+  };
+  const updateFade = (camera: THREE.Vector3, focus: THREE.Vector3, dt: number) => {
+    const hidden = blocks(camera, focus) || blocks(camera, focus.clone().add(new THREE.Vector3(0, 0.8, 0)));
+    const target = hidden ? 0.25 : 1;
+    if (Math.abs(washerAlpha - target) < 0.001) return;
+    washerAlpha += (target - washerAlpha) * Math.min(1, dt * 8);
+    if (Math.abs(washerAlpha - target) < 0.01) washerAlpha = target;
+    washerGroup.traverse((o) => {
+      const m = o as THREE.Mesh;
+      if (!m.isMesh) return;
+      // 다른 가구와 같이 쓰는 재질이라 처음 한 번 복사해서 세탁기 것만 흐리게
+      if (!m.userData.fadeBase) {
+        const own = (m.material as THREE.MeshLambertMaterial).clone();
+        m.userData.fadeBase = own.opacity;
+        own.transparent = true;
+        m.material = own;
+      }
+      const mat = m.material as THREE.MeshLambertMaterial;
+      mat.opacity = m.userData.fadeBase * washerAlpha;
+      mat.depthWrite = washerAlpha > 0.99;
+    });
+  };
 
   // ---------- 빨래건조대 (거실 오른쪽 앞) ----------
   const RACK = { x0: 5.2, x1: 9.8, z0: 3.9, z1: 5.6, top: 2.2 };
@@ -483,6 +516,7 @@ export function createHouse(): House {
     group,
     heightAt,
     setSunbeam,
+    updateFade,
     fridge: { setOpen, light, tray, trayHome, front: new THREE.Vector3(21.25, 0, -2.0) },
     frontDoor: {
       setOpen: (k: number) => (frontDoorPivot.rotation.y = 1.7 * k),

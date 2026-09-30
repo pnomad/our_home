@@ -36,34 +36,35 @@ export function createZzz() {
 
 /** 머리 위 말풍선 */
 function createBubble() {
+  const W = 440; // 주고받는 대사가 길어도 글자가 찌그러지지 않게 넉넉히
   const canvas = document.createElement('canvas');
-  canvas.width = 320;
+  canvas.width = W;
   canvas.height = 96;
   const tex = new THREE.CanvasTexture(canvas);
   const sprite = new THREE.Sprite(new THREE.SpriteMaterial({ map: tex, transparent: true, depthTest: false }));
   sprite.renderOrder = 11;
   sprite.visible = false;
-  sprite.scale.set(1.6, 0.48, 1);
+  sprite.scale.set(1.6 * (W / 320), 0.48, 1);
   const draw = (text: string) => {
     const g = canvas.getContext('2d')!;
-    g.clearRect(0, 0, 320, 96);
+    g.clearRect(0, 0, W, 96);
     g.font = 'bold 34px sans-serif';
-    const w = Math.min(300, g.measureText(text).width + 40);
-    const x = (320 - w) / 2;
+    const w = Math.min(W - 20, g.measureText(text).width + 40);
+    const x = (W - w) / 2;
     g.fillStyle = '#fffaf0';
     g.strokeStyle = '#e0d2b8';
     g.lineWidth = 4;
     g.beginPath();
     g.roundRect(x, 6, w, 60, 30);
-    g.moveTo(150, 64);
-    g.lineTo(160, 88);
-    g.lineTo(172, 64);
+    g.moveTo(W / 2 - 10, 64);
+    g.lineTo(W / 2, 88);
+    g.lineTo(W / 2 + 12, 64);
     g.fill();
     g.stroke();
     g.fillStyle = '#5a4630';
     g.textAlign = 'center';
     g.textBaseline = 'middle';
-    g.fillText(text, 160, 38, 280);
+    g.fillText(text, W / 2, 38, W - 40);
     tex.needsUpdate = true;
   };
   return { sprite, draw };

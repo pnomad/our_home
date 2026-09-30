@@ -43,7 +43,8 @@ export interface VillagerInfo {
   places: Partial<Record<PlaceId, Talk[]>>; // 그 장소에 있을 때만
   talks: Talk[]; // 평소
   // 머리 위 말풍선
-  bubbles: { idle: string[]; chat: string[]; fight: string[]; sunbathe: string[] };
+  // 머리 위 말풍선. 싸움은 fightStart(따지기) → fightBack(받아치기) → fight(아무 말) 순서
+  bubbles: { idle: string[]; chat: string[]; fight: string[]; fightStart: string[]; fightBack: string[]; sunbathe: string[] };
 }
 
 const YES_NO = (yes: string[], no: string[]): Choice[] => [
@@ -107,6 +108,8 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       idle: ['꽥!', '심심했땅~', '헤헤헤', '어디 갔땅?'],
       chat: ['놀자땅!', '내가 첫째땅!', '마다오?', '헤헤'],
       fight: ['꽥꽥!!', '내가 첫째땅!!', '덤벼땅!', '꽥!!!'],
+      fightStart: ['내 자리였땅!', '내 간식 먹었땅?!', '대장 말 안 들었땅!'],
+      fightBack: ['아니에오! 땅!', '대장한테 덤볐땅?!', '나 아니었땅!'],
       sunbathe: ['빠삭~', '빠삭빠삭땅~ ☀️', '뽀송해졌땅~'],
     },
   },
@@ -162,6 +165,8 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       idle: ['따몽~', '음…', '평화로웠따몽', '…'],
       chat: ['무슨 일이데오?', '밥은 먹었따몽?', '마다오.', '괜찮았따몽'],
       fight: ['그만했따몽!', '진정했따몽…', '아니에오!'],
+      fightStart: ['그건 형아 거였따몽!', '줄 서야 했따몽!', '또 사고 쳤따몽?'],
+      fightBack: ['아니에오!', '형아가 참았따몽…', '오해였따몽!'],
       sunbathe: ['따뜻했따몽…', '빠삭~', '말랑해졌따몽~'],
     },
   },
@@ -218,6 +223,8 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       idle: ['하암…', '킁킁', '졸렸씨바…', '멍!'],
       chat: ['뭔일이래?', '졸렸씨바…', '마다오~', '같이 잤씨바?'],
       fight: ['왈왈!!', '아니에오!!', '앙!!', '멍멍!!'],
+      fightStart: ['내 빠삭 자리였씨바!', '자는데 깨웠씨바!', '꼬리 밟았씨바!'],
+      fightBack: ['아니에오!!', '나 아니었씨바!', '뭔일이래?!'],
       sunbathe: ['빠삭~', '빠삭빠삭씨바~ ☀️', '쿨… 빠삭…'],
     },
   },
@@ -272,10 +279,39 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       idle: ['흠흠', '그렇구나감자', '📖', '음~'],
       chat: ['아니에오!', '책에서 봤감자', '마다오!', '퀴즈 냈감자!'],
       fight: ['아니에오!!', '과학적으로 틀렸감자!', '흥!'],
+      fightStart: ['내 책 가져갔감자?!', '과학적으로 틀렸감자!', '조용히 해야 했감자!'],
+      fightBack: ['아니에오!', '증거 있었감자?!', '내가 맞았감자!'],
       sunbathe: ['빠삭~', '비타민D 충전감자 ☀️', '따뜻했감자~'],
     },
   },
 };
+
+/** 형제끼리 주고받는 수다 (머리 위 말풍선). 둘 중 누가 먼저 찾아갔든 이 순서대로 말함 */
+export interface ChatScript {
+  pair: [VillagerId, VillagerId];
+  lines: [VillagerId, string][];
+}
+
+export const CHATS: ChatScript[] = [
+  // 땅이 · 따몽
+  { pair: ['ddangi', 'ddamong'], lines: [['ddangi', '따몽아 놀자땅!'], ['ddamong', '뭐 하고 놀았따몽?'], ['ddangi', '술래잡기땅!'], ['ddamong', '나 느린 거 알았따몽…']] },
+  { pair: ['ddangi', 'ddamong'], lines: [['ddangi', '냉장고 가자땅!'], ['ddamong', '아까 먹었따몽.'], ['ddangi', '또 먹었땅!'], ['ddamong', '…하나만이따몽.']] },
+  // 땅이 · 시바
+  { pair: ['ddangi', 'shiba'], lines: [['ddangi', '시바 일어났땅?'], ['shiba', '…쿨…'], ['ddangi', '꼬리 당긴다땅!'], ['shiba', '뭔일이래?!']] },
+  { pair: ['ddangi', 'shiba'], lines: [['ddangi', '빠삭하러 가자땅!'], ['shiba', '좋았씨바…'], ['ddangi', '내가 먼저땅!'], ['shiba', '자리 맡았씨바!']] },
+  // 땅이 · 감자
+  { pair: ['ddangi', 'gamja'], lines: [['ddangi', '감자 뭐 읽었땅?'], ['gamja', '오리 백과사전!'], ['ddangi', '나도 나왔땅?'], ['gamja', '대장은 없었감자.']] },
+  { pair: ['ddangi', 'gamja'], lines: [['gamja', '퀴즈 냈감자!'], ['ddangi', '정답은 만두땅!'], ['gamja', '아직 안 냈감자…'], ['ddangi', '헤헤헤~']] },
+  // 따몽 · 시바
+  { pair: ['ddamong', 'shiba'], lines: [['ddamong', '또 졸렸따몽?'], ['shiba', '조금 졸렸씨바…'], ['ddamong', '배 위에서 자따몽.'], ['shiba', '말랑했씨바…']] },
+  { pair: ['ddamong', 'shiba'], lines: [['shiba', '형아 베개 해줘씨바'], ['ddamong', '마다오. 누웠따몽.'], ['shiba', '쿨…'], ['ddamong', '벌써 잤따몽…']] },
+  // 따몽 · 감자
+  { pair: ['ddamong', 'gamja'], lines: [['ddamong', '밥은 먹었따몽?'], ['gamja', '마다오! 먹었감자.'], ['ddamong', '기특했따몽.'], ['gamja', '헤헤, 좋았감자']] },
+  { pair: ['ddamong', 'gamja'], lines: [['gamja', '연필 몇 자루였감자?'], ['ddamong', '열두 자루였따몽.'], ['gamja', '열세 자루였감자!'], ['ddamong', '…다시 셌따몽.']] },
+  // 시바 · 감자
+  { pair: ['shiba', 'gamja'], lines: [['gamja', '형아 꼬리 봤감자!'], ['shiba', '뭔일이래?'], ['gamja', '난 꼬리 없었감자'], ['shiba', '…충격이었씨바.']] },
+  { pair: ['shiba', 'gamja'], lines: [['shiba', '같이 잤씨바?'], ['gamja', '공부해야 했감자.'], ['shiba', '딱 오 분만씨바…'], ['gamja', '…오 분만이었감자.']] },
+];
 
 /** 대사 속 {이름}·{상대}·{친구} 를 실제 이름으로 */
 export function fillNames(talk: Talk, names: { 이름: string; 상대: string; 친구?: string }): Talk {
