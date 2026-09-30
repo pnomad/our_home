@@ -2,94 +2,18 @@
 // 시바(맨 아래, 자는 중) → 감자 → 따몽 → 땅이(맨 위). 탑이 흔들리다 와르르 무너지고 다 같이 몰래 먹는다.
 // 대사를 바꾸려면 아래 say(...) 부분만 고치면 된다.
 import * as THREE from 'three';
-import type { Character } from '../entities/models';
-import { createZzz, type Villager } from '../entities/villager';
 import type { VillagerId } from '../entities/styles';
-import type { House } from '../world/house';
-import type { Lighting } from '../world/lighting';
-import type { DialogueBox, Speaker } from '../ui/dialogue';
-import type { Fade } from '../ui/fade';
+import { fallAsleep, wakeUp, sayer, tween, face, hop, walk, heightOf, wait, type EventContext } from './common';
 
-export interface RaidContext {
-  house: House;
-  villagers: Record<VillagerId, Villager>;
-  player: Character;
-  dialogue: DialogueBox;
-  lighting: Lighting;
-  fade: Fade;
-  /** focus = null 이면 다시 플레이어를 따라감. snap = true 면 부드럽게 말고 바로 이동 (암전 중에 사용) */
-  setCamera(focus: THREE.Vector3 | null, zoom?: number, snap?: boolean): void;
-  setNameTags(visible: boolean): void;
-  /** 다음 날 아침으로 넘기고 날짜를 돌려줌 */
-  nextDay(): number;
-}
-
-const NARRATOR: Speaker = { name: '', order: '', color: '' };
-
-const frame = () => new Promise<number>((r) => requestAnimationFrame(r));
-const wait = (sec: number) => new Promise((r) => setTimeout(r, sec * 1000));
-const ease = (k: number) => (k < 0.5 ? 2 * k * k : 1 - (-2 * k + 2) ** 2 / 2);
-
-/** sec초 동안 k(0→1)로 fn을 부름 */
-async function tween(sec: number, fn: (k: number) => void, easing = ease) {
-  const start = performance.now();
-  for (;;) {
-    const k = Math.min(1, (performance.now() - start) / 1000 / sec);
-    fn(easing(k));
-    if (k >= 1) return;
-    await frame();
-  }
-}
-
-function face(obj: THREE.Object3D, to: THREE.Vector3) {
-  obj.rotation.y = Math.atan2(to.x - obj.position.x, to.z - obj.position.z);
-}
-
-/** 포물선을 그리며 폴짝 */
-async function hop(obj: THREE.Object3D, to: THREE.Vector3, sec = 0.55, height = 0.8, spin = 0) {
-  const from = obj.position.clone();
-  const ry = obj.rotation.y;
-  await tween(sec, (k) => {
-    obj.position.lerpVectors(from, to, k);
-    obj.position.y += 4 * height * k * (1 - k);
-    obj.rotation.y = ry + spin * k;
-  }, (k) => k);
-}
-
-async function walk(v: Villager, to: THREE.Vector3, speed = 2.2) {
-  const obj = v.char.root;
-  face(obj, to);
-  const from = obj.position.clone();
-  v.walking = true;
-  await tween(from.distanceTo(to) / speed, (k) => obj.position.lerpVectors(from, to, k), (k) => k);
-  v.walking = false;
-}
-
-/** 캐릭터 키 (납작하게 줄인 것도 반영) */
-function heightOf(c: Character) {
-  c.root.updateMatrixWorld(true);
-  return new THREE.Box3().setFromObject(c.body).max.y - c.root.position.y;
-}
-
-export async function runFridgeRaid(ctx: RaidContext) {
-  const { house, villagers: V, player, dialogue, lighting, fade } = ctx;
+export async function runFridgeRaid(ctx: EventContext) {
+  const { house, villagers: V, fade } = ctx;
   const { fridge } = house;
   const all = Object.values(V);
-  const say = (v: Villager | null, ...pages: string[]) => dialogue.play(v ? v.info : NARRATOR, [{ pages }]);
+  const say = sayer(ctx.dialogue);
 
   // ---------- 1. 잠들기 ----------
-  const playerZzz = createZzz();
-  await fade.out('쿨… 쿨…');
-  await wait(0.8);
-  lighting.setNight(true);
-  // 플레이어는 침대에 누움
-  player.root.position.set(-16.3, 1.85, -3.4);
-  player.root.rotation.set(-Math.PI / 2, 0, 0);
-  player.root.add(playerZzz);
-  playerZzz.visible = true;
-  playerZzz.position.set(0.4, 0.4, 0.9);
+  const playerZzz = await fallAsleep(ctx);
   // 인형들은 부엌 바닥으로
-  ctx.setNameTags(false);
   const starts: Record<VillagerId, THREE.Vector3> = {
     ddangi: new THREE.Vector3(19.8, 0, 1.2),
     ddamong: new THREE.Vector3(21.4, 0, 2.2),
@@ -97,7 +21,6 @@ export async function runFridgeRaid(ctx: RaidContext) {
     shiba: new THREE.Vector3(22.2, 0, 1.0),
   };
   for (const v of all) {
-    v.setScripted(true);
     v.char.root.position.copy(starts[v.info.id]);
     v.char.root.rotation.set(0, Math.PI, 0);
   }
@@ -231,32 +154,17 @@ export async function runFridgeRaid(ctx: RaidContext) {
   await say(null, '그날 밤, 만두는 하나도 남지 않았다…');
 
   // ---------- 7. 다음 날 아침 ----------
-  const day = ctx.nextDay();
-  await fade.out(`${day}일째 아침 ☀️`);
-  await wait(1.2);
-  fridge.setOpen(0);
-  fridge.light.intensity = 0;
-  // 증거: 바닥에 빈 쟁반 + 만두 부스러기
-  fridge.tray.rotation.set(0, 0.4, 0);
-  fridge.tray.position.set(20.8, 0.04, 0.8);
-  mandus.forEach((m, i) => {
-    m.visible = i < 2;
-    m.scale.set(0.05, 0.04, 0.04);
-    m.position.set(0.6 + i * 0.3, -0.03, 0.5 + i * 0.2);
+  await wakeUp(ctx, playerZzz, () => {
+    fridge.setOpen(0);
+    fridge.light.intensity = 0;
+    // 증거: 바닥에 빈 쟁반 + 만두 부스러기
+    fridge.tray.rotation.set(0, 0.4, 0);
+    fridge.tray.position.set(20.8, 0.04, 0.8);
+    mandus.forEach((m, i) => {
+      m.visible = i < 2;
+      m.scale.set(0.05, 0.04, 0.04);
+      m.position.set(0.6 + i * 0.3, -0.03, 0.5 + i * 0.2);
+    });
   });
-  for (const v of all) {
-    const z = v.zone;
-    v.char.root.position.set((z.x0 + z.x1) / 2, z.y, (z.z0 + z.z1) / 2);
-    v.char.root.rotation.set(0, 0, 0);
-    v.char.root.scale.set(1, 1, 1);
-    v.setScripted(false);
-  }
-  player.root.remove(playerZzz);
-  player.root.rotation.set(0, 0, 0);
-  player.root.position.set(-13.8, 1.6, -1.2); // 침대 가장자리에서 깸 (가운데는 시바 자리)
-  ctx.setNameTags(true);
-  ctx.setCamera(null, 1, true);
-  await wait(0.5);
-  await fade.in();
   await say(null, '…어라? 부엌에서 무슨 냄새가 난다.', '인형들한테 무슨 일인지 물어보자.');
 }

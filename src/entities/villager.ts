@@ -111,6 +111,8 @@ export class Villager {
   /** 말 거는 중 (움직임 멈춤) */
   talking = false;
   scripted = false;
+  /** 빨래 뒤 건조대에서 마르는 중 (움직이지 않지만 말은 걸 수 있음) */
+  drying = false;
   walking = false;
   airborne = false;
   zzz = createZzz();
@@ -143,7 +145,7 @@ export class Villager {
 
   /** 말 걸 수 있는 상태인지 */
   get talkable() {
-    return !this.engaged && !this.airborne && !this.scripted;
+    return this.drying || (!this.engaged && !this.airborne && !this.scripted);
   }
 
   remember(kind: Memory['kind'], at: number, withV?: Villager) {

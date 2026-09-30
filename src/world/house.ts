@@ -35,6 +35,33 @@ export interface Fridge {
   front: THREE.Vector3; // 탑을 쌓는 자리 (문 바로 앞 바닥)
 }
 
+/** 대문 (부엌 오른쪽 벽) + 문밖 쓰레기봉지 (고양이 이벤트용) */
+export interface FrontDoor {
+  /** 0 = 닫힘, 1 = 밖으로 활짝 */
+  setOpen(k: number): void;
+  inside: THREE.Vector3; // 문 안쪽 바닥
+  outside: THREE.Vector3; // 문밖 바닥
+  bag: THREE.Group; // 쓰레기봉지
+  /** 봉지가 뜯겨서 쓰레기가 흩어짐 (0 = 멀쩡, 1 = 다 흩어짐) */
+  setTorn(k: number): void;
+  light: THREE.PointLight; // 현관등
+}
+
+/** 드럼세탁기 (빨래 이벤트용). 문은 왼쪽 경첩으로 앞(+z)으로 열림 */
+export interface Washer {
+  group: THREE.Group; // 덜덜 떨 때 흔듦
+  setOpen(k: number): void;
+  door: THREE.Vector3; // 투입구 가운데 (월드 좌표)
+  front: THREE.Vector3; // 세탁기 앞 바닥
+  drum: THREE.Group; // 유리 너머로 보이는 빨래 (돌림)
+}
+
+/** 빨래건조대: 인형들을 눕혀 말리는 자리 4곳 */
+export interface Rack {
+  spots: THREE.Vector3[];
+  front: THREE.Vector3; // 건조대 앞 바닥
+}
+
 /** 사각 구역 + 높이 */
 export interface Area {
   x0: number;
@@ -49,6 +76,9 @@ export interface House {
   /** 침실 창문으로 들어와 침대를 비추는 햇빛 (0 = 없음, 1 = 가장 밝음) */
   setSunbeam(k: number): void;
   fridge: Fridge;
+  frontDoor: FrontDoor;
+  washer: Washer;
+  rack: Rack;
   bed: Area; // 잘 자기 버튼이 뜨는 곳
   /** (x, z)에서 밟을 수 있는 가장 높은 면의 높이. 벽·집 밖은 Infinity */
   heightAt(x: number, z: number): number;
@@ -64,6 +94,7 @@ const ROOMS = [
   { name: '부엌', x0: 11, x1: 23, wall: 0xfbefcf, floor: 'tile' as const },
 ];
 const DOOR = { z0: 1, z1: 4.5 };
+const FRONT_DOOR = { z0: -2.8, z1: 0.2, h: 5.6 };
 
 function woodTexture() {
   const c = document.createElement('canvas');
@@ -139,7 +170,10 @@ export function createHouse(): House {
   // 바닥 앞 테두리 (인형의 집 단면)
   box([BOUNDS.x0 - 0.5, BOUNDS.x1 + 0.5], [-0.6, 0], [6, 6.4], 0xb08a64, false);
   box([-21.5, -21], [0, 8], [-6.5, 6], ROOMS[0].wall); // 왼쪽 벽
-  box([23, 23.5], [0, 8], [-6.5, 6], ROOMS[2].wall); // 오른쪽 벽
+  // 오른쪽 벽 (부엌 대문 자리만 뚫림)
+  box([23, 23.5], [0, 8], [-6.5, FRONT_DOOR.z0], ROOMS[2].wall);
+  box([23, 23.5], [0, 8], [FRONT_DOOR.z1, 6], ROOMS[2].wall);
+  box([23, 23.5], [FRONT_DOOR.h, 8], [FRONT_DOOR.z0, FRONT_DOOR.z1], ROOMS[2].wall, false);
   for (const x of [-7, 11]) {
     // 방 사이 벽 (문 뚫림, 앞은 낮게)
     box([x - 0.25, x + 0.25], [0, 8], [-6, DOOR.z0], 0xf4ede4);
@@ -295,6 +329,122 @@ export function createHouse(): House {
   box([12.8, 13.9], [0, 0.8], [-3.3, -2.1], 0xa3c4a8); // 작은 발판
   box([15.5, 16.5], [2.5, 2.9], [-0.5, 0.5], 0xffffff, false); // 접시
 
+  // ---------- 대문 + 문밖 ----------
+  box([23.5, 29], [-0.6, 0], [-4.5, 2.5], 0xcfc6b8, false); // 문밖 시멘트 바닥
+  box([23.5, 23.9], [0, 0.25], [FRONT_DOOR.z0, FRONT_DOOR.z1], 0xb9ae9e, false); // 문턱
+  const doorW = FRONT_DOOR.z1 - FRONT_DOOR.z0;
+  // 경첩은 안쪽(뒤) 끝: 밖으로 열면 문짝이 뒤로 가서 문밖이 가려지지 않음
+  const frontDoorPivot = new THREE.Group();
+  frontDoorPivot.position.set(23.25, 0, FRONT_DOOR.z0);
+  const doorPanel = new THREE.Mesh(new THREE.BoxGeometry(0.2, FRONT_DOOR.h, doorW), mat(0x9b6b4a));
+  doorPanel.position.set(0, FRONT_DOOR.h / 2, doorW / 2);
+  doorPanel.castShadow = true;
+  const knob = new THREE.Mesh(new THREE.SphereGeometry(0.13, 12, 8), mat(0xe0c070));
+  knob.position.set(-0.18, 2.6, doorW - 0.35);
+  frontDoorPivot.add(doorPanel, knob);
+  group.add(frontDoorPivot);
+  // 문밖 현관등 (밤 이벤트 때 켬)
+  box([23.5, 23.8], [FRONT_DOOR.h + 0.3, FRONT_DOOR.h + 0.9], [-1.6, -1.0], 0xfff3c4, false);
+  const porchLight = new THREE.PointLight(0xffd99a, 0, 12, 1.2);
+  porchLight.position.set(24.4, FRONT_DOOR.h + 0.4, -1.3);
+  group.add(porchLight);
+  // 쓰레기봉지 (반투명 흰 종량제 봉투) + 뜯기면 흩어지는 쓰레기
+  const bag = new THREE.Group();
+  bag.position.set(25.6, 0, -0.4);
+  const bagMat = new THREE.MeshLambertMaterial({ color: 0xf1efe4, transparent: true, opacity: 0.92 });
+  const bagBody = new THREE.Mesh(new THREE.SphereGeometry(1, 20, 14), bagMat);
+  bagBody.scale.set(0.95, 1.05, 0.85);
+  bagBody.position.y = 0.95;
+  bagBody.castShadow = true;
+  const bagKnot = new THREE.Mesh(new THREE.ConeGeometry(0.25, 0.5, 10), bagMat);
+  bagKnot.position.y = 2.1;
+  bag.add(bagBody, bagKnot);
+  group.add(bag);
+  const trash: [THREE.Mesh, THREE.Vector3][] = [];
+  const addTrash = (geo: THREE.BufferGeometry, color: number, to: [number, number, number], rotZ = 0) => {
+    const m = new THREE.Mesh(geo, mat(color));
+    m.position.set(25.6, 0.9, -0.4);
+    m.rotation.z = rotZ;
+    m.castShadow = true;
+    m.visible = false;
+    group.add(m);
+    trash.push([m, new THREE.Vector3(...to)]);
+  };
+  const peel = new THREE.SphereGeometry(0.28, 10, 6, 0, Math.PI * 2, 0, Math.PI / 2.5);
+  addTrash(peel, 0xf29a2e, [24.4, 0.02, 0.9]); // 귤껍질
+  addTrash(peel, 0xf29a2e, [27.2, 0.02, -1.6]);
+  const tissue = new THREE.IcosahedronGeometry(0.26, 0);
+  addTrash(tissue, 0xffffff, [26.9, 0.2, 1.2]); // 뭉친 휴지
+  addTrash(tissue, 0xf4f1ea, [24.3, 0.2, -2.3]);
+  addTrash(new THREE.CylinderGeometry(0.18, 0.18, 0.5, 12), 0xc8d0d6, [27.6, 0.18, 0.2], Math.PI / 2); // 빈 캔
+  addTrash(new THREE.BoxGeometry(0.7, 0.05, 0.5), 0xe7d3a8, [25.2, 0.03, 1.6]); // 과자 봉지
+  addTrash(new THREE.BoxGeometry(0.12, 0.05, 0.6), 0xd9d2c0, [26.3, 0.03, -2.0]); // 생선 가시
+  const bagHome = bagBody.scale.clone();
+  const setTorn = (k: number) => {
+    bagBody.scale.set(bagHome.x * (1 + 0.1 * k), bagHome.y * (1 - 0.45 * k), bagHome.z * (1 + 0.1 * k));
+    bagBody.position.y = 0.95 * (1 - 0.45 * k);
+    bagKnot.position.y = 2.1 - 1.0 * k;
+    for (const [m, to] of trash) {
+      m.visible = k > 0;
+      m.position.lerpVectors(new THREE.Vector3(25.6, 0.9, -0.4), to, k);
+      m.position.y += Math.sin(k * Math.PI) * 0.8;
+    }
+  };
+
+  // ---------- 드럼세탁기 (부엌 오른쪽 앞, 앞을 보고 섬) ----------
+  const washerGroup = new THREE.Group();
+  group.add(washerGroup);
+  solids.push({ x0: 20.5, x1: 22.9, z0: 2.6, z1: 5.0, top: 3.0 });
+  const wbox = (x: [number, number], y: [number, number], z: [number, number], color: number) => {
+    const m = box(x, y, z, color, false);
+    washerGroup.add(m);
+    return m;
+  };
+  wbox([20.5, 22.9], [0, 3.0], [2.6, 5.0], 0xf7f7f4); // 몸통
+  wbox([20.5, 22.9], [2.45, 3.0], [5.0, 5.05], 0xdde3e8); // 조작판
+  wbox([22.2, 22.6], [2.55, 2.9], [5.05, 5.15], 0x9aa7b0); // 다이얼
+  wbox([20.8, 21.9], [2.62, 2.82], [5.05, 5.08], 0x7fc8e8); // 화면
+  const DOOR_C = new THREE.Vector3(21.7, 1.3, 5.05);
+  const hole = new THREE.Mesh(new THREE.CircleGeometry(0.72, 32), mat(0x2d3640)); // 드럼 안쪽 (어두움)
+  hole.position.set(DOOR_C.x, DOOR_C.y, 5.01);
+  washerGroup.add(hole);
+  const drum = new THREE.Group();
+  drum.position.set(DOOR_C.x, DOOR_C.y, 5.06); // 드럼 안 빨래는 유리(5.12)와 안쪽(5.01) 사이 납작하게
+  washerGroup.add(drum);
+  const washerDoor = new THREE.Group(); // 경첩(왼쪽)이 원점
+  washerDoor.position.set(DOOR_C.x - 0.82, DOOR_C.y, 5.1);
+  const ring = new THREE.Mesh(new THREE.TorusGeometry(0.72, 0.12, 10, 32), mat(0xc9d1d8));
+  ring.position.x = 0.82;
+  const glass = new THREE.Mesh(
+    new THREE.CircleGeometry(0.66, 32),
+    new THREE.MeshLambertMaterial({ color: 0xa9d6ee, transparent: true, opacity: 0.35 }),
+  );
+  glass.position.set(0.82, 0, 0.02);
+  washerDoor.add(ring, glass);
+  washerGroup.add(washerDoor);
+  const setWasherOpen = (k: number) => {
+    washerDoor.rotation.y = -1.9 * k;
+  };
+
+  // ---------- 빨래건조대 (거실 오른쪽 앞) ----------
+  const RACK = { x0: 5.2, x1: 9.8, z0: 3.9, z1: 5.6, top: 2.2 };
+  const RACK_C = 0xdfe5ea;
+  solids.push({ x0: RACK.x0, x1: RACK.x1, z0: RACK.z0, z1: RACK.z1, top: RACK.top });
+  for (const x of [RACK.x0 + 0.1, RACK.x1 - 0.1]) {
+    // 옆에서 보면 X자 다리
+    for (const dir of [1, -1]) {
+      const leg = new THREE.Mesh(new THREE.BoxGeometry(0.08, 2.6, 0.08), mat(RACK_C));
+      leg.position.set(x, RACK.top / 2, (RACK.z0 + RACK.z1) / 2);
+      leg.rotation.x = dir * 0.36;
+      leg.castShadow = true;
+      group.add(leg);
+    }
+  }
+  for (let z = RACK.z0 + 0.1; z <= RACK.z1; z += 0.35) {
+    box([RACK.x0, RACK.x1], [RACK.top - 0.06, RACK.top], [z - 0.03, z + 0.03], RACK_C, false); // 빨랫줄 봉
+  }
+  const rackMid = (RACK.z0 + RACK.z1) / 2;
+
   // ---------- 햇빛 줄기: 침실 창문 → 침대 ----------
   const beamMat = new THREE.MeshBasicMaterial({
     color: 0xffcf73, transparent: true, opacity: 0, depthWrite: false,
@@ -332,6 +482,25 @@ export function createHouse(): House {
     heightAt,
     setSunbeam,
     fridge: { setOpen, light, tray, trayHome, front: new THREE.Vector3(21.25, 0, -2.0) },
+    frontDoor: {
+      setOpen: (k: number) => (frontDoorPivot.rotation.y = 1.7 * k),
+      inside: new THREE.Vector3(21.8, 0, (FRONT_DOOR.z0 + FRONT_DOOR.z1) / 2),
+      outside: new THREE.Vector3(24.6, 0, (FRONT_DOOR.z0 + FRONT_DOOR.z1) / 2),
+      bag,
+      setTorn,
+      light: porchLight,
+    },
+    washer: {
+      group: washerGroup,
+      setOpen: setWasherOpen,
+      door: DOOR_C.clone().setZ(5.1),
+      front: new THREE.Vector3(DOOR_C.x, 0, 5.6),
+      drum,
+    },
+    rack: {
+      spots: [0, 1, 2, 3].map((i) => new THREE.Vector3(RACK.x0 + 0.7 + i * 1.07, RACK.top, rackMid)),
+      front: new THREE.Vector3((RACK.x0 + RACK.x1) / 2, 0, 3.1),
+    },
     bed: { x0: -19.5, x1: -13, z0: -5.5, z1: -0.5, y: 1.6 },
     spawn: new THREE.Vector3(-2, 0, 4),
     zones: {

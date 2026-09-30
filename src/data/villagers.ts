@@ -5,7 +5,8 @@
 // {친구} 는 방금 같이 뭔가 한 형제 이름으로 바뀐다.
 //
 // 말을 걸면 이 순서로 대사를 고른다:
-//   냉장고 털이 다음 날 → 지금 하는 일(빠삭·낮잠) → 방금 있었던 일(싸움·장난·같이 낮잠) → 인사 → 지금 있는 장소 → 평소 대사
+//   밤 이벤트 다음 날(냉장고 털이·고양이 싸움) → 건조대에서 말리는 중 → 빨래 끝난 뒤
+//   → 지금 하는 일(빠삭·낮잠) → 방금 있었던 일(싸움·장난·같이 낮잠) → 인사 → 지금 있는 장소 → 평소 대사
 import type { VillagerId } from '../entities/styles';
 import type { PlaceId } from '../world/places';
 
@@ -34,6 +35,9 @@ export interface VillagerInfo {
   greetings: { morning: Talk; day: Talk; night: Talk };
   wakeUp: Talk; // 자다가 깼을 때
   afterRaid: Talk; // 냉장고 털기 다음 날 처음 말 걸었을 때
+  afterCatFight: Talk; // 고양이와 싸운 다음 날 (꼬질꼬질) 처음 말 걸었을 때
+  drying: Talk; // 빨래하고 건조대에서 마르는 중
+  afterWash: Talk; // 다 마르고 처음 말 걸었을 때
   sunbathe: Talk[]; // 햇빛 받으며 빠삭하는 중
   memory: Partial<Record<MemoryTalkKind, Talk>>; // 방금 있었던 일
   places: Partial<Record<PlaceId, Talk[]>>; // 그 장소에 있을 때만
@@ -66,6 +70,9 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       pages: ['마, 만두?! 나 아니땅!', '…입가에 묻은 거 만두 아니땅. 그냥 묻었땅.', '…믿었땅?'],
       choices: YES_NO(['그치땅? 역시 내 편이땅! 헤헤.'], ['…들켰땅. 대장이 책임졌땅!']),
     },
+    afterCatFight: { pages: ['어젯밤에 고양이랑 한판 붙었땅!', '대문 앞 쓰레기봉지를 뒤지길래 대장이 먼저 돌격했땅!', '…그래서 이렇게 꼬질꼬질해졌땅. 그래도 이겼땅!'] },
+    drying: { pages: ['세탁기 빙글빙글 너무 재밌었땅!!', '다 마르면 한 번 더 탔땅!'] },
+    afterWash: { pages: ['뽀송뽀송해졌땅! 냄새 맡아봤땅?', '섬유유연제 냄새 났땅~ 헤헤.'] },
     sunbathe: [
       { pages: ['빠삭빠삭했땅~', '햇빛 받으니까 털이 뽀송해졌땅!'] },
       { pages: ['{이름}도 여기 누웠땅!', '빠삭 자리는 내가 맡아놨땅. 첫째니까땅!'] },
@@ -119,6 +126,9 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     },
     wakeUp: { pages: ['…음, {이름}이었따몽.', '잠깐 눈 붙였따몽. 괜찮았따몽.'] },
     afterRaid: { pages: ['…마다오. 어젯밤 만두는 우리가 먹었따몽.', '땅이가 작전 짜고 내가 가운데서 받쳤따몽.', '미안했따몽. 다음엔 하나 남겨뒀따몽.'] },
+    afterCatFight: { pages: ['…어젯밤에 대문 밖에서 부스럭 소리가 났따몽.', '고양이가 쓰레기봉지를 뜯고 있었따몽. 다 같이 쫓아냈따몽.', '동생들 지키느라 좀 더러워졌따몽. 괜찮았따몽.'] },
+    drying: { pages: ['세탁기 안에서 동생들 꼭 안고 있었따몽.', '이제 뽀송해지는 중이었따몽…'] },
+    afterWash: { pages: ['깨끗해지니까 기분 좋았따몽.', '고마웠따몽. 다음엔 고양이한테 좀 살살 했따몽.'] },
     sunbathe: [
       { pages: ['햇빛이 따뜻했따몽…', '이럴 때는 아무 생각 안 했따몽.'] },
       { pages: ['동생들이랑 같이 빠삭하니까 좋았따몽.', '{이름}도 누워봤따몽. 자리 있었따몽.'] },
@@ -171,6 +181,9 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     },
     wakeUp: { pages: ['쿨… 쿨…', '음냐… 뭔일이래?', '…방금 잠들었씨바.'] },
     afterRaid: { pages: ['나는 맨 아래에서 계속 잤씨바…', '아무것도 몰랐씨바.', '…근데 이상하게 배불렀씨바.'] },
+    afterCatFight: { pages: ['자고 있었는데 부스럭부스럭 소리 났씨바…', '나가 보니까 고양이였씨바! 앙 물었씨바!', '…근데 입에 털 들어갔씨바. 퉤퉤.'] },
+    drying: { pages: ['…어지러웠씨바.', '그래도 여기 누워 있으니까 좋았씨바… 쿨…'] },
+    afterWash: { pages: ['뽀송해졌씨바…', '뽀송하니까 또 졸렸씨바… 쿨…'] },
     sunbathe: [
       { pages: ['빠삭~ 최고였씨바…', '여기서 평생 살았씨바…'] },
       { pages: ['햇빛 받으면 졸렸씨바…', '빠삭하다가 잠들면 더 좋았씨바… 쿨…'] },
@@ -224,6 +237,9 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     },
     wakeUp: { pages: ['으음… 꿈에서 책 읽었감자.', '{이름}이었감자? 깜짝 놀랐감자.'] },
     afterRaid: { pages: ['탑 높이 계산은 완벽했감자.', '땅이 형아가 만두 보고 신나서 흔들었감자.', '그래서 무너졌감자. 과학적으로 땅이 형아 잘못이었감자.'] },
+    afterCatFight: { pages: ['고양이는 우리보다 열 배는 무거웠감자.', '그래도 넷이 힘을 합치니까 이겼감자. 과학이었감자!', '…근데 흙먼지 때문에 기침 났감자. 콜록.'] },
+    drying: { pages: ['드럼세탁기는 1분에 천 번 돌았감자.', '…다 세어봤감자. 어지러웠감자.'] },
+    afterWash: { pages: ['빨래하고 나니까 털이 1.3배 부풀었감자.', '측정했감자. 과학이었감자!'] },
     sunbathe: [
       { pages: ['햇빛에는 비타민D가 있었감자.', '그래서 빠삭하면 똑똑해졌감자!'] },
       { pages: ['빠삭 온도를 재봤감자.', '…너무 따뜻해서 까먹었감자.'] },

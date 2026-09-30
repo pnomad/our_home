@@ -12,6 +12,9 @@ import { createLighting } from './world/lighting';
 import { createClock } from './world/clock';
 import { createClockHud } from './ui/hud';
 import { runFridgeRaid } from './events/fridgeRaid';
+import { runCatFight } from './events/catFight';
+import { runLaundry, finishDrying } from './events/laundry';
+import { runQuietNight, NARRATOR, type EventContext } from './events/common';
 import { getMoveInput } from './input';
 
 const PLAYER_SPEED = 4; // 칸/초
@@ -117,6 +120,13 @@ const greeted = new Set<VillagerId>();
 let cutscene = false; // 이벤트 연출 중이면 조작 막음
 let raidDone = false; // 냉장고 털기 다음 날
 const heardAfterRaid = new Set<VillagerId>();
+// 고양이 소동 → 꼬질꼬질 → 네 명 다 이야기 들으면 빨래 → 건조대에서 마름 → 뽀송
+let needsWash = false;
+const heardCatFight = new Set<VillagerId>();
+let dryUntil = -1; // 다 마르는 게임 시각(분), -1 이면 말리는 중 아님
+const DRY_MINUTES = 90;
+let washed = false;
+const heardAfterWash = new Set<VillagerId>();
 const talkBags = new Map<VillagerId, Talk[]>();
 
 function nearestVillager() {
@@ -124,7 +134,9 @@ function nearestVillager() {
   let bestDist = TALK_DISTANCE;
   for (const v of villagers) {
     if (!v.talkable) continue; // 싸움·장난 중이거나 점프 중이면 말 걸 수 없음
-    const d = v.position.distanceTo(player.root.position);
+    const p = player.root.position;
+    // 건조대에 널린 인형은 바닥에서 올려다보며 말 걸기 (높이 차이 무시)
+    const d = v.drying ? Math.hypot(v.position.x - p.x, v.position.z - p.z) : v.position.distanceTo(p);
     if (d < bestDist) {
       best = v;
       bestDist = d;
@@ -157,6 +169,15 @@ function nextTalk(v: Villager): { talk: Talk; friend?: string } {
     heardAfterRaid.add(v.info.id);
     return { talk: v.info.afterRaid };
   }
+  if (needsWash && !heardCatFight.has(v.info.id)) {
+    heardCatFight.add(v.info.id);
+    return { talk: v.info.afterCatFight };
+  }
+  if (v.drying) return { talk: v.info.drying };
+  if (washed && !heardAfterWash.has(v.info.id)) {
+    heardAfterWash.add(v.info.id);
+    return { talk: v.info.afterWash };
+  }
   if (v.activity === 'sunbathe') return { talk: pick(v.info.sunbathe) };
   const memory = freshMemoryTalk(v);
   if (memory) return memory;
@@ -184,6 +205,39 @@ async function talkTo(v: Villager | null) {
   const talks = (wasSleeping ? [v.info.wakeUp, talk] : [talk]).map((t) => fillNames(t, names));
   await dialogue.play(v.info, talks);
   v.endTalk();
+  if (readyToWash() && heardCatFight.has(v.info.id) && talk === v.info.afterCatFight) {
+    await dialogue.play(NARRATOR, [{ pages: ['다들 흙먼지 투성이다…', '오늘은 씻는 날! 🫧', '(부엌 세탁기 앞에서 빨래를 할 수 있어요)'] }]);
+  }
+}
+
+/** 네 명 모두에게 고양이 이야기를 들었으면 빨래 가능 */
+function readyToWash() {
+  return needsWash && heardCatFight.size === villagers.length;
+}
+
+/** 세탁기 앞 바닥에 서 있는지 */
+function nearWasher() {
+  const p = player.root.position;
+  const f = house.washer.front;
+  return grounded && p.y < 0.1 && Math.hypot(p.x - f.x, p.z - f.z) < 1.8;
+}
+
+async function doLaundry() {
+  cutscene = true;
+  actionButton.show(null);
+  await runLaundry(eventContext());
+  needsWash = false;
+  heardCatFight.clear();
+  dryUntil = nowMinutes(clock) + DRY_MINUTES;
+  cutscene = false;
+}
+
+/** 다 말랐으면 건조대에서 내려옴 */
+function dryDone(instant = false) {
+  dryUntil = -1;
+  washed = true;
+  heardAfterWash.clear();
+  return finishDrying(villagers, house.rack, instant);
 }
 
 /** 침대 위에 서 있는지 */
@@ -209,11 +263,8 @@ async function passOut() {
   await sleepAndRaid();
 }
 
-/** 잠들면 냉장고 털기 → 다음 날 아침 */
-async function sleepAndRaid() {
-  cutscene = true;
-  actionButton.show(null);
-  await runFridgeRaid({
+function eventContext(): EventContext {
+  return {
     house, player, dialogue, lighting, fade,
     villagers: Object.fromEntries(villagers.map((v) => [v.info.id, v])) as Record<VillagerId, Villager>,
     setCamera(focus, z = 1, snap = false) {
@@ -228,9 +279,34 @@ async function sleepAndRaid() {
       lighting.setTime(clock.minutes);
       return day;
     },
-  });
-  raidDone = true;
+  };
+}
+
+type NightEvent = 'fridge' | 'cat' | 'none';
+/** 밤 이벤트는 각각 10% 확률 (테스트용: 주소 뒤 ?event=fridge | cat | none 으로 고정) */
+function pickNightEvent(): NightEvent {
+  const forced = new URLSearchParams(location.search).get('event');
+  if (forced === 'fridge' || forced === 'cat' || forced === 'none') return forced;
+  const r = Math.random();
+  return r < 0.1 ? 'fridge' : r < 0.2 ? 'cat' : 'none';
+}
+
+/** 잠들면 (가끔) 밤 이벤트 → 다음 날 아침 */
+async function sleepAndRaid() {
+  cutscene = true;
+  actionButton.show(null);
+  if (dryUntil >= 0) await dryDone(true); // 건조대에 널린 채로 밤이 되면 그냥 다 마른 걸로
+  const night = pickNightEvent();
+  const ctx = eventContext();
+  if (night === 'fridge') await runFridgeRaid(ctx);
+  else if (night === 'cat') await runCatFight(ctx);
+  else await runQuietNight(ctx);
+  raidDone = night === 'fridge';
   heardAfterRaid.clear();
+  if (night === 'cat') {
+    needsWash = true;
+    heardCatFight.clear();
+  }
   vy = 0;
   grounded = true;
   cutscene = false;
@@ -242,6 +318,7 @@ function currentAction(): { label: string; run: () => void } | null {
   const near = nearestVillager();
   if (near) return { label: `💬 ${near.info.name}에게 말 걸기`, run: () => talkTo(near) };
   if (onBed()) return { label: '🛏️ 잘 자기', run: () => goToSleep() };
+  if (readyToWash() && nearWasher()) return { label: '🧺 빨래하기', run: () => doLaundry() };
   return null;
 }
 
@@ -290,6 +367,7 @@ function update(dt: number, t: number) {
   }
   clockHud.update(clock);
   if (clock.isOver() && !cutscene && !dialogue.isOpen) passOut();
+  if (dryUntil >= 0 && nowMinutes(clock) >= dryUntil && !cutscene && !dialogue.isOpen) dryDone();
 
   // 플레이어 이동 (대화 중엔 멈춤). 축별로 따로 검사해서 벽에 비비며 미끄러지게
   const input = dialogue.isOpen || cutscene ? { x: 0, y: 0 } : getMoveInput();
@@ -357,7 +435,7 @@ function hitsVillager(x: number, z: number) {
 }
 
 // 개발 중 브라우저 콘솔에서 테스트용 (예: __game.talkTo(__game.villagers[0]))
-if (import.meta.env.DEV) Object.assign(window, { __game: { player, villagers, talkTo, dialogue, update, jump, goToSleep, clock, life } });
+if (import.meta.env.DEV) Object.assign(window, { __game: { player, villagers, talkTo, dialogue, update, jump, goToSleep, clock, life, doLaundry } });
 
 camera.position.set(THREE.MathUtils.clamp(player.root.position.x, -15, 17), 0, Math.min(player.root.position.z, 0.5)).add(CAMERA_OFFSET.clone().multiplyScalar(zoom));
 tick();

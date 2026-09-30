@@ -35,7 +35,7 @@ export const PLACES: Record<PlaceId, Place> = Object.fromEntries(
     P('doorLK', 11, 0, 2.75),
     // 부엌
     P('kitEntry', 12.6, 0, 4.3),
-    P('kitchen', 17, 0, 4.5, { area: { x0: 12.5, x1: 22.5, z0: 3.4, z1: 5.6 } }),
+    P('kitchen', 17, 0, 4.5, { area: { x0: 12.5, x1: 20, z0: 3.4, z1: 5.6 } }), // 오른쪽 끝은 세탁기
     P('tableFront', 14.6, 0, 4.3),
     P('tableChair', 14.6, 1.5, 2.2),
     P('table', 14.8, 2.5, 0.8, { area: { x0: 13.4, x1: 17.6, z0: -1.6, z1: 1.1 } }),
