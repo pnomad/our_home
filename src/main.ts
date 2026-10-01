@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { createHouse, HOP_HEIGHT, JUMP_HEIGHT } from './world/house';
 import { createNameTag } from './entities/models';
+import { preloadModels } from './entities/modelStyle';
 import { createPlayerCharacter, createVillager, styleFromUrl, PLAYER_NAMES, type PlayerId, type VillagerId } from './entities/styles';
 import { choosePlayer } from './ui/chooser';
 import { Villager, turnToward, type World } from './entities/villager';
@@ -97,6 +98,7 @@ function jump() {
 }
 
 // 캐릭터 스타일: 주소 뒤 ?style=block | plush | voxel
+await preloadModels(); // 블렌더로 만든 인형 모델 (있는 것만)
 const style = styleFromUrl();
 const ids: VillagerId[] = ['ddangi', 'ddamong', 'shiba', 'gamja'];
 const nameTags: THREE.Sprite[] = [];

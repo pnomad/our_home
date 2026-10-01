@@ -4,6 +4,7 @@ import { createDdangi, createGamja, createDdamong, createShiba } from './models'
 import { ddangi, gamja, ddamong, shiba, ttungttaengi, ttungsuni, type CharacterSpec } from './shapeSpecs';
 import { buildPlush } from './plushStyle';
 import { buildVoxel } from './voxelStyle';
+import { buildModel, hasModel } from './modelStyle';
 
 export type VillagerId = 'ddangi' | 'gamja' | 'ddamong' | 'shiba';
 export type StyleId = 'block' | 'plush' | 'voxel';
@@ -24,7 +25,7 @@ const blockBuilders: Record<VillagerId, () => Character> = {
 export const STYLE_NAMES: Record<StyleId, string> = { block: '블록', plush: '말랑 인형', voxel: '복셀' };
 
 export function createVillager(id: VillagerId, style: StyleId): Character {
-  if (style === 'plush') return buildPlush(specs[id]);
+  if (style === 'plush') return hasModel(id) ? buildModel(id) : buildPlush(specs[id]);
   if (style === 'voxel') return buildVoxel(specs[id]);
   return blockBuilders[id]();
 }

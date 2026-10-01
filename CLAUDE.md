@@ -35,6 +35,7 @@ npm run build      # tsc 타입 검사 + 빌드. 테스트 코드는 없음 → 
   - `shapeSpecs.ts` 캐릭터 설계도(덩어리 + 얼굴 무늬). `plushStyle.ts`·`voxelStyle.ts` 가 이걸 그림, `models.ts` 는 블록 스타일
   - `meltStyle.ts` 덩어리를 녹여 붙인 한 겹 표면 (지금은 고양이·쓰레기봉지만 사용)
   - `dirt.ts` 꼬질꼬질 흙먼지 얼룩 붙이기/떼기
+  - `modelStyle.ts` 블렌더로 만든 진짜 3D 인형 모델(`public/models/*.glb`). 모델이 있는 인형은 말랑 인형 스타일에서 이걸로 그림 (지금은 시바)
   - `dance.ts` 라디오 춤 (땅이 땅댄스 = 날개 쫙 벌리고 몸만 흔들기, 나머지는 각자 흔들흔들). 팔은 설계도 덩어리의 `part: 'armL' | 'armR'` 로 따로 움직임
 - `src/events/` — 밤 이벤트. `common.ts` 에 잠들기·다음 날 아침·연출 도구(tween, hop, walk)
   - `fridgeRaid.ts` 냉장고 털기: 시바→감자→따몽→땅이 탑 쌓기 → 와르르 → 만두 몰래 먹기
@@ -49,6 +50,18 @@ npm run build      # tsc 타입 검사 + 빌드. 테스트 코드는 없음 → 
   - 개발 콘솔 `__claw` (enter, rig, ctrl, `pause = true` 로 물리 멈춤). 같은 더미로 비교하려면 `Math.random` 을 시드 고정한 뒤 `rig.fillPrizes()`
 
 집 좌표: x -21~23 (침실 · 거실 · 부엌 순), z -6(뒷벽)~6(앞, 벽 없음), y 위. 캐릭터는 +z 를 앞으로 본다.
+
+## 3D 모델 만들기 (블렌더)
+
+블렌더를 파이썬 모듈(bpy)로 설치해서 스크립트로 모델을 만든다. 블렌더 프로그램을 열 필요 없음.
+
+```
+python3 -m venv .blender && .blender/bin/pip install bpy==4.2.0   # 약 500MB, 파이썬 3.11 필요
+.blender/bin/python tools/blender/shiba.py [미리보기.png]          # public/models/shiba.glb 로 내보냄
+```
+
+- `tools/blender/common.py` — 타원체 덩어리 합치기 → 복셀 리메시 + 매끈하게, 솔기 홈, 정점 색칠, 얼굴 단추(눈·코) 붙이기, glb 내보내기, Cycles 미리보기
+- 좌표: 블렌더 Z 위 · -Y 앞으로 만들면 glb 에서 게임 좌표(Y 위, +Z 앞)가 된다. 크기는 게임 그대로 (키 약 1칸)
 
 ## 인형들 · 말투
 

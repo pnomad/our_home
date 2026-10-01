@@ -2,6 +2,7 @@
 // 위쪽 버튼으로 스타일 전환. ?style=voxel 로 시작 스타일, ?angle=0.5 로 회전 고정(라디안)
 import * as THREE from 'three';
 import { createNameTag } from './entities/models';
+import { preloadModels } from './entities/modelStyle';
 import { createPlayerCharacter, createVillager, styleFromUrl, PLAYER_NAMES, STYLE_NAMES, type PlayerId, type StyleId, type VillagerId } from './entities/styles';
 import { VILLAGERS } from './data/villagers';
 
@@ -25,6 +26,7 @@ floor.rotation.x = -Math.PI / 2;
 floor.receiveShadow = true;
 scene.add(floor);
 
+await preloadModels(); // 블렌더로 만든 인형 모델 (있는 것만)
 const styles: StyleId[] = ['block', 'plush', 'voxel'];
 const ids: VillagerId[] = ['ddangi', 'gamja', 'ddamong', 'shiba'];
 type RowId = StyleId | 'players';
