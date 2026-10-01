@@ -42,6 +42,11 @@ npm run build      # tsc 타입 검사 + 빌드. 테스트 코드는 없음 → 
   - `laundry.ts` 씻는 날: 빨래망 → 드럼세탁기 → 빨래건조대에서 말리기
 - `src/world/` — `house.ts` 집·가구(인형 키 1칸 기준, 전부 축 정렬 상자, 거실 테이블 위 라디오), `places.ts` 주민 이동 지도, `clock.ts` 게임 시계(하루 = 실제 20분, 날짜는 localStorage), `lighting.ts`, `radioMusic.ts` 라디오 노래(126 BPM, 파일 없이 브라우저에서 합성)
 - `src/ui/` — 대화창, 암전, 시계, 시작 화면
+- `src/claw/` + `claw.html` — 거실 컴퓨터로 하는 인형뽑기 (pnomad/zzang 에서 가져옴). Rapier 물리. 집에서는 화면 가득 iframe 으로 열고, 오락실에서 Esc → `postMessage('claw:exit')` 로 집에 돌아옴
+  - `physics/plushMesh.ts` 인형 부품을 녹여 붙인 한 겹 천 겉모습, `prizes/plushDent.ts` 집게 발이 파고든 자리가 움푹
+  - 인형 천 접촉: 마찰은 큰 쪽(Max), 튕김 0, 회전 감쇠 큼 (`prizes/ragdoll.ts`). 속심(PLUSH_CORE)을 줄이면 오히려 잘 미끄러지니 0.8 유지
+  - 배출구 앞 힘 빠짐은 집은 뒤(올라갈 때부터)에만 (`game/controller.ts powerFor`)
+  - 개발 콘솔 `__claw` (enter, rig, ctrl, `pause = true` 로 물리 멈춤). 같은 더미로 비교하려면 `Math.random` 을 시드 고정한 뒤 `rig.fillPrizes()`
 
 집 좌표: x -21~23 (침실 · 거실 · 부엌 순), z -6(뒷벽)~6(앞, 벽 없음), y 위. 캐릭터는 +z 를 앞으로 본다.
 

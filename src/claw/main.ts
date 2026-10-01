@@ -550,6 +550,9 @@ const aim = new AimGuide(scene);
 const AIM_PHASES: Phase[] = ['idle', 'moveX', 'moveZ', 'move', 'result'];
 
 // ---------- 루프 ----------
+/** 디버깅용: 물리 멈춤 (화면 확인할 때) */
+let debugPause = false;
+
 function updatePlay(dt: number) {
   const rig = rigOf();
   const c = ctrl!;
@@ -564,6 +567,8 @@ function updatePlay(dt: number) {
     rig.claw.syncCableFromObjects(trolley);
     rig.syncGantryVisual(trolley);
     hud.updateReplay(replay.frame, rec.phases[i], replay.playing);
+  } else if (debugPause) {
+    rig.syncAll(); // 디버깅: 물리는 멈추고 화면만
   } else {
     acc += dt;
     let n = 0;
@@ -621,5 +626,6 @@ Object.assign(window, {
   __claw: {
     get rig() { return cur?.rig; }, get ctrl() { return ctrl; }, get mode() { return sceneMode; },
     input, camera, orbit, machines, lobby, renderer, enter: enterNear, leave: leaveMachine,
+    set pause(v: boolean) { debugPause = v; },
   },
 });

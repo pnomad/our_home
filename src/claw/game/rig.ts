@@ -7,6 +7,7 @@ import { GEOMETRY, type MachineGeometry, type MachineSettings, type PrizeKind } 
 import { spawnPrize, removePrize, setSquish, updateSquashVisual, type Prize } from '../prizes/ragdoll';
 import { touchingHandles } from './analysis';
 import { PRIZES } from '../prizes/shapes';
+import { fingerProbes, probeSpheres, dentPrize } from '../prizes/plushDent';
 
 /** 한 대의 기계: 물리 월드 + 캐비닛 + 집게 + 갠트리 + 경품들 */
 export class Rig {
@@ -19,6 +20,8 @@ export class Rig {
   prizes: Prize[] = [];
   /** 대기 중인 집게 끝의 높이 (경품 바닥 기준) */
   readonly clawTipY: number;
+  /** 인형 천을 움푹 누르는 집게 발 모양 (plushDent.ts) */
+  private readonly probes: ReturnType<typeof fingerProbes>;
 
   constructor(private scene: THREE.Object3D, readonly settings: MachineSettings) {
     this.world = createWorld();
@@ -42,6 +45,7 @@ export class Rig {
       THREE.MathUtils.clamp(this.cabinet.chuteCenter.y, min.z, max.z),
     );
     this.claw = new Claw(this.world, scene, g, settings, this.home);
+    this.probes = fingerProbes(this.world, this.claw.fingerColliderHandles);
     this.gantry = new Gantry(this.home.x, this.home.y, min, max, g.moveAccel, g.moveSmooth);
     this.fillPrizes();
   }
@@ -145,6 +149,13 @@ export class Rig {
     }
   }
 
+  /** 경품 하나를 그 자리에 놓기 (실험·테스트용) */
+  addPrize(kind: PrizeKind, pos: THREE.Vector3, rot = new THREE.Quaternion()) {
+    const p = spawnPrize(this.world, this.scene, kind, pos, rot);
+    this.prizes.push(p);
+    return p;
+  }
+
   removePrizeObj(p: Prize) {
     removePrize(this.world, this.scene, p);
     this.prizes = this.prizes.filter((q) => q !== p);
@@ -157,7 +168,22 @@ export class Rig {
   syncAll() {
     for (const s of this.synced) syncObject(s);
     this.claw.sync();
+    this.updateDents();
     this.syncGantryVisual(this.claw.trolley.translation());
+  }
+
+  /** 집게 발 근처 인형은 발이 파고든 자리가 움푹, 멀어지면 천천히 원래대로 */
+  private updateDents() {
+    this.scene.updateWorldMatrix(true, false);
+    const m = this.scene.matrixWorld, sc = m.getMaxScaleOnAxis();
+    const spheres = probeSpheres(this.probes).map((s) => ({ c: s.c.applyMatrix4(m), r: s.r * sc }));
+    const hub = this.claw.hub.translation();
+    for (const p of this.prizes) {
+      if (p.def.category !== 'plush') continue;
+      const t = p.main.translation();
+      const near = Math.hypot(t.x - hub.x, t.y - hub.y, t.z - hub.z) < p.def.size * 2.5 + this.claw.L * 1.5;
+      dentPrize(p.synced.map((q) => q.obj), near ? spheres : []);
+    }
   }
 
   syncGantryVisual(t: { x: number; z: number }) {

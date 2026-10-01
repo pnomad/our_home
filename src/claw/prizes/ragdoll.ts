@@ -27,8 +27,10 @@ export interface Prize {
 
 let nextId = 1;
 
-/** 인형 속심 비율: 겉 솜 두께만큼 발이 파고든다 */
+/** 인형 속심 비율: 겉 솜 두께만큼 발이 파고든다 (겉모습은 그만큼 움푹 들어간다, plushDent.ts) */
 export const PLUSH_CORE = 0.8;
+/** 인형은 떨어져도 통통 튀거나 굴러가지 않고 털썩 멈춘다 (솜이 충격을 먹음) */
+const PLUSH_DAMPING = { linear: 0.6, angular: 2.2 };
 
 export function spawnPrize(
   world: RAPIER.World,
@@ -52,11 +54,12 @@ export function spawnPrize(
     RAPIER.RigidBodyDesc.dynamic()
       .setTranslation(pos.x, pos.y, pos.z)
       .setRotation({ x: rot.x, y: rot.y, z: rot.z, w: rot.w })
-      .setLinearDamping(0.1)
-      .setAngularDamping(0.3)
+      .setLinearDamping(def.category === 'plush' ? PLUSH_DAMPING.linear : 0.1)
+      .setAngularDamping(def.category === 'plush' ? PLUSH_DAMPING.angular : 0.3)
       .setCcdEnabled(def.size < 0.05),
   );
   const m = attachParts(world, main, parts, { ...common, mass: def.mass - limbMass });
+  if (def.category === 'plush') m.colliders.forEach(fabricContact);
   // 몸통 메시를 한 겹 더 감싸서, 눌렸을 때 이 노드만 납작하게 만든다
   const squashNode = new THREE.Group();
   squashNode.matrixAutoUpdate = false;
@@ -94,6 +97,7 @@ export function spawnPrize(
         .setAngularDamping(0.5),
     );
     const l = attachParts(world, body, limb.parts, { ...common, core, mass });
+    if (def.category === 'plush' && core !== 1) l.colliders.forEach(fabricContact);
     scene.add(l.group);
     const axis = new THREE.Vector3(...limb.axis);
     const jd = RAPIER.JointData.revolute(
@@ -111,6 +115,16 @@ export function spawnPrize(
     prize.synced.push({ body, obj: l.group });
   }
   return prize;
+}
+
+/**
+ * 천(솜인형) 접촉: 집게 발·다른 인형과 닿을 때 마찰은 둘 중 큰 쪽(천이 금속 발에 잘 걸림),
+ * 튕김은 둘 중 작은 쪽(천은 거의 안 튐)으로.
+ */
+function fabricContact(c: RAPIER.Collider) {
+  c.setFrictionCombineRule(RAPIER.CoefficientCombineRule.Max);
+  c.setRestitution(0);
+  c.setRestitutionCombineRule(RAPIER.CoefficientCombineRule.Min);
 }
 
 export function removePrize(world: RAPIER.World, scene: THREE.Object3D, p: Prize) {

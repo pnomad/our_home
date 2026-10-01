@@ -89,11 +89,16 @@ export class Controller {
     return near + (1 - near) * t * t * (3 - 2 * t);
   }
 
-  /** 구간별 집게 힘 (0~1). 배출구에 가까우면 약해진다. 강집게 판은 모든 구간이 강집게 힘 이상. */
+  /**
+   * 구간별 집게 힘 (0~1). 강집게 판은 모든 구간이 강집게 힘 이상.
+   * 배출구 앞 힘 빠짐은 집은 뒤(올라갈 때부터)에만: 실제 기계처럼 배출구 앞 인형도 일단 꽉 잡지만
+   * 올라가기 시작하면 바로 놓아서 거의 그 자리에 떨어진다. 그래서 배출구 쪽으로 살짝 치우쳐 잡으면
+   * 오므라드는 발이 인형을 배출구 쪽으로 끌어당긴 채 놓아서 들어간다 (끌당).
+   */
   powerFor(p: 'grab' | 'lift' | 'top' | 'return'): number {
     const s = this.s;
     const base = { grab: s.grabPower, lift: s.liftPower, top: s.topPower, return: s.returnPower }[p];
-    const v = base * this.zoneFactor(this.rig.gantry.x, this.rig.gantry.z);
+    const v = base * (p === 'grab' ? 1 : this.zoneFactor(this.rig.gantry.x, this.rig.gantry.z));
     return (this.strongTurn ? Math.max(v, s.strongPower) : v) / 100;
   }
 
