@@ -229,6 +229,53 @@ function setRadio(on: boolean) {
   else music.stop();
 }
 
+// ---------- 🎮 컴퓨터: 인형뽑기 게임 (claw.html 을 화면 가득 띄움) ----------
+function nearComputer() {
+  const p = player.root.position;
+  return house.computers.some((c) => Math.hypot(p.x - c.x, p.z - c.z) < 1.6);
+}
+
+let clawFrame: HTMLIFrameElement | null = null;
+const clawClose = document.createElement('button');
+clawClose.textContent = '✕ 컴퓨터 끄기';
+Object.assign(clawClose.style, {
+  position: 'fixed', zIndex: '61', right: '14px', bottom: '14px', display: 'none',
+  font: "700 15px 'Malgun Gothic', sans-serif", color: '#5a4630', background: '#fffaf0',
+  border: 'none', borderRadius: '999px', padding: '10px 18px', cursor: 'pointer',
+  boxShadow: '0 3px 0 #e8dcc4, 0 6px 14px rgba(0,0,0,.25)',
+});
+clawClose.addEventListener('pointerdown', (e) => {
+  e.stopPropagation();
+  closeClaw();
+});
+document.body.appendChild(clawClose);
+
+function openClaw() {
+  cutscene = true;
+  actionButton.show(null);
+  setRadio(false);
+  clawFrame = document.createElement('iframe');
+  clawFrame.src = 'claw.html';
+  clawFrame.title = '인형뽑기';
+  Object.assign(clawFrame.style, { position: 'fixed', inset: '0', width: '100%', height: '100%', border: 'none', zIndex: '60', background: '#17131f' });
+  document.body.appendChild(clawFrame);
+  clawFrame.addEventListener('load', () => clawFrame?.contentWindow?.focus());
+  clawClose.style.display = '';
+}
+
+function closeClaw() {
+  if (!clawFrame) return;
+  clawFrame.remove(); // 소리·물리도 같이 멈춤
+  clawFrame = null;
+  clawClose.style.display = 'none';
+  cutscene = false;
+  window.focus();
+}
+
+window.addEventListener('message', (e) => {
+  if (e.data === 'claw:exit') closeClaw();
+});
+
 /** 네 명 모두에게 고양이 이야기를 들었으면 빨래 가능 */
 function readyToWash() {
   return needsWash && heardCatFight.size === villagers.length;
@@ -339,6 +386,7 @@ function currentAction(): { label: string; run: () => void } | null {
   if (near) return { label: `💬 ${near.info.name}에게 말 걸기`, run: () => talkTo(near) };
   if (onBed()) return { label: '🛏️ 잘 자기', run: () => goToSleep() };
   if (readyToWash() && nearWasher()) return { label: '🧺 빨래하기', run: () => doLaundry() };
+  if (nearComputer()) return { label: '🎮 컴퓨터에서 게임하기', run: () => openClaw() };
   if (nearRadio()) return life.radioOn
     ? { label: '📻 라디오 끄기', run: () => setRadio(false) }
     : { label: '📻 라디오 켜기', run: () => setRadio(true) };
@@ -460,7 +508,7 @@ function hitsVillager(x: number, z: number) {
 }
 
 // 개발 중 브라우저 콘솔에서 테스트용 (예: __game.talkTo(__game.villagers[0]))
-if (import.meta.env.DEV) Object.assign(window, { __game: { player, villagers, talkTo, dialogue, update, jump, goToSleep, clock, life, doLaundry, setRadio } });
+if (import.meta.env.DEV) Object.assign(window, { __game: { player, villagers, talkTo, dialogue, update, jump, goToSleep, clock, life, doLaundry, setRadio, openClaw } });
 
 camera.position.set(THREE.MathUtils.clamp(player.root.position.x, -15, 17), 0, Math.min(player.root.position.z, 0.5)).add(CAMERA_OFFSET.clone().multiplyScalar(zoom));
 tick();

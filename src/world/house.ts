@@ -92,6 +92,8 @@ export interface House {
   washer: Washer;
   rack: Rack;
   radio: Radio;
+  /** 거실 컴퓨터 책상 (모니터 앞 의자 쪽). 여기서 [컴퓨터에서 게임하기] */
+  computers: THREE.Vector3[];
   bed: Area; // 잘 자기 버튼이 뜨는 곳
   /** (x, z)에서 밟을 수 있는 가장 높은 면의 높이. 벽·집 밖은 Infinity */
   heightAt(x: number, z: number): number;
@@ -323,7 +325,9 @@ export function createHouse(): House {
   box([1.6, 2.4], [0, 2.1], [-6, -2.4], 0x7fa397);
   box([-2.2, -0.8], [0, 0.8], [-2.3, -1.0], 0xf4b183);
   // 컴퓨터 책상 두 개 + 모니터 + 의자 + 상자(계단)
+  const computers: THREE.Vector3[] = [];
   for (const [x0, x1] of [[3, 6.6], [6.8, 10.6]]) {
+    computers.push(new THREE.Vector3((x0 + x1) / 2, 0, -3.2));
     box([x0, x1], [2.4, 2.6], [-6, -3.8], 0xf1ece4); // 상판
     box([x0, x0 + 0.2], [0, 2.4], [-6, -3.8], 0xd9d2c7);
     box([x1 - 0.2, x1], [0, 2.4], [-6, -3.8], 0xd9d2c7);
@@ -607,6 +611,7 @@ export function createHouse(): House {
     setSunbeam,
     updateFade,
     radio,
+    computers,
     fridge: { setOpen, light, tray, trayHome, front: new THREE.Vector3(21.25, 0, -2.0) },
     frontDoor: {
       setOpen: (k: number) => (frontDoorPivot.rotation.y = 1.7 * k),
