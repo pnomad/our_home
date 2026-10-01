@@ -20,6 +20,7 @@ npm run build      # tsc 타입 검사 + 빌드. 테스트 코드는 없음 → 
 | `?event=cat` / `fridge` / `none` | 잘 때 밤 이벤트 고정 (평소엔 각각 10% 확률) |
 | `?bird=crow` / `sparrow` / `pigeon` / `magpie` | 그 새가 바로 침실 창문에 찾아옴 (평소엔 매일 10:30~12:00 사이 한 번, 무작위) |
 | `?day=3` | 3일째로 시작 (축구공은 3일째부터) |
+| `?read=1` | 감자가 바로 소파에서 책을 읽음 |
 | `?story=sock` | 4일째 양말 소동을 바로 (평소엔 4일째 9:20~12:00 에 한 번, 본 뒤엔 localStorage `our-house:sock-done`) |
 | `?style=block` / `plush` / `voxel` | 인형 그리는 스타일 (기본 plush) |
 | `?zoom=0.4` | 카메라 줌 |

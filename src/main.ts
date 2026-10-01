@@ -120,6 +120,8 @@ const ball = createBall(scene, house.heightAt);
 const BALL_HOME = { x: -1.6, z: 0.6 };
 const life = createLife({ clock, villagers, heightAt: house.heightAt, danceSpots: house.radio.danceSpots, books: house.books, ball });
 life.start();
+// 테스트용: ?read=1 이면 감자가 바로 소파에서 책을 읽음
+if (new URLSearchParams(location.search).get('read') === '1') life.queueRead(villagers.find((v) => v.info.id === 'gamja')!);
 
 // ---------- 알림: 화면 위에 잠깐 뜨는 한 줄 ----------
 const toastEl = document.createElement('div');
