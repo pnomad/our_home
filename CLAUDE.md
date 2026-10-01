@@ -18,11 +18,13 @@ npm run build      # tsc 타입 검사 + 빌드. 테스트 코드는 없음 → 
 | `?who=ttungsuni` / `ttungttaengi` | 시작 화면의 "누구로 놀까요?" 건너뛰기 |
 | `?night=1`, `?time=18.5` | 밤 9시 / 오후 6시 반에서 시작 (새벽 1시 = 25) |
 | `?event=cat` / `fridge` / `none` | 잘 때 밤 이벤트 고정 (평소엔 각각 10% 확률) |
+| `?bird=crow` / `sparrow` / `pigeon` / `magpie` | 그 새가 바로 침실 창문에 찾아옴 (평소엔 매일 10:30~12:00 사이 한 번, 무작위) |
+| `?day=3` | 3일째로 시작 (축구공은 3일째부터) |
 | `?style=block` / `plush` / `voxel` | 인형 그리는 스타일 (기본 plush) |
 | `?zoom=0.4` | 카메라 줌 |
 | characters.html `?angle=0.5` | 도감 회전 고정 (라디안) |
 
-개발 모드에선 브라우저 콘솔에 `__game` 이 있다: `__game.goToSleep()`, `__game.talkTo(__game.villagers[0])`, `__game.doLaundry()`, `__game.setRadio(true)`, `__game.clock.update(60)`(게임 시간 60분 앞당김) 등.
+개발 모드에선 브라우저 콘솔에 `__game` 이 있다: `__game.goToSleep()`, `__game.talkTo(__game.villagers[0])`, `__game.doLaundry()`, `__game.setRadio(true)`, `__game.bird('crow')`, `__game.life.queueRead(__game.villagers[3])`, `__game.clock.update(60)`(게임 시간 60분 앞당김) 등.
 
 화면으로 확인할 때는 Playwright(크로미움)로 위 주소를 열고, 대화창은 스페이스 키로 넘기면서 스크린샷을 찍으면 된다. `goToSleep()` 처럼 연출이 끝나야 끝나는 함수는 `page.evaluate` 에서 await 하지 말 것 (대화를 넘길 수 없어서 멈춤).
 
@@ -35,13 +37,15 @@ npm run build      # tsc 타입 검사 + 빌드. 테스트 코드는 없음 → 
   - `shapeSpecs.ts` 캐릭터 설계도(덩어리 + 얼굴 무늬). `plushStyle.ts`·`voxelStyle.ts` 가 이걸 그림, `models.ts` 는 블록 스타일
   - `meltStyle.ts` 덩어리를 녹여 붙인 한 겹 표면 (지금은 고양이·쓰레기봉지만 사용)
   - `dirt.ts` 꼬질꼬질 흙먼지 얼룩 붙이기/떼기
+  - `life.ts` 에 감자 독서(소파 위 책 두 권 중 하나를 펼쳐 듦), 축구공 패스·혼자 차기도 있음
   - `modelStyle.ts` 블렌더로 만든 진짜 3D 인형 모델(`public/models/*.glb`). 모델이 있는 인형은 말랑 인형 스타일에서 이걸로 그림 (지금은 시바)
   - `dance.ts` 라디오 춤 (땅이 땅댄스 = 날개 쫙 벌리고 몸만 흔들기, 나머지는 각자 흔들흔들). 팔은 설계도 덩어리의 `part: 'armL' | 'armR'` 로 따로 움직임
 - `src/events/` — 밤 이벤트. `common.ts` 에 잠들기·다음 날 아침·연출 도구(tween, hop, walk)
   - `fridgeRaid.ts` 냉장고 털기: 시바→감자→따몽→땅이 탑 쌓기 → 와르르 → 만두 몰래 먹기
   - `catFight.ts` 고양이 소동: 대문 앞 쓰레기봉지 뒤지는 고양이와 한판 → 꼬질꼬질
   - `laundry.ts` 씻는 날: 빨래망 → 드럼세탁기 → 빨래건조대에서 말리기
-- `src/world/` — `house.ts` 집·가구(인형 키 1칸 기준, 전부 축 정렬 상자, 거실 테이블 위 라디오), `places.ts` 주민 이동 지도, `clock.ts` 게임 시계(하루 = 실제 20분, 날짜는 localStorage), `lighting.ts`, `radioMusic.ts` 라디오 노래(126 BPM, 파일 없이 브라우저에서 합성)
+  - `birdVisit.ts` 아침 손님 (낮, 게임 안 멈춤, 말풍선): 침실 창밖 창턱에 새. 참새·비둘기·까치는 땅이·감자가 헤드보드 위에서 대화, 까마귀는 땅이 깜짝·따몽 "문 열면 위험해!"·감자 창문 잠금·시바 구경. 새 모양은 `entities/birds.ts`
+- `src/world/` — `house.ts` 집·가구(인형 키 1칸 기준, 전부 축 정렬 상자, 거실 테이블 위 라디오), `places.ts` 주민 이동 지도, `clock.ts` 게임 시계(하루 = 실제 20분, 날짜는 localStorage), `lighting.ts`, `radioMusic.ts` 라디오 노래(126 BPM, 파일 없이 브라우저에서 합성), `ball.ts` 축구공(굴러감·튕김·밀림, 3일째부터 소파 앞)
 - `src/ui/` — 대화창, 암전, 시계, 시작 화면
 - `src/claw/` + `claw.html` — 거실 컴퓨터로 하는 인형뽑기 (pnomad/zzang 에서 가져옴). Rapier 물리. 집에서는 화면 가득 iframe 으로 열고, 오락실에서 Esc → `postMessage('claw:exit')` 로 집에 돌아옴
   - `physics/plushMesh.ts` 인형 부품을 녹여 붙인 한 겹 천 겉모습, `prizes/plushDent.ts` 집게 발이 파고든 자리가 움푹

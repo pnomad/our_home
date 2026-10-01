@@ -18,6 +18,9 @@ import { runLaundry, finishDrying } from './events/laundry';
 import { runQuietNight, NARRATOR, type EventContext } from './events/common';
 import { getMoveInput } from './input';
 import { createRadioMusic } from './world/radioMusic';
+import { runBirdVisit } from './events/birdVisit';
+import { createBall } from './world/ball';
+import { BIRD_KINDS, type BirdKind } from './entities/birds';
 
 const PLAYER_SPEED = 4; // 칸/초
 const PLAYER_RADIUS = 0.3;
@@ -111,8 +114,57 @@ const villagers = ids.map((id) => {
   return v;
 });
 // 주민들이 알아서 돌아다니며 빠삭·낮잠·싸움·장난을 시작
-const life = createLife({ clock, villagers, heightAt: house.heightAt, danceSpots: house.radio.danceSpots });
+// ⚽ 축구공: 3일째부터 소파 앞에 (처음엔 숨겨 둠)
+const ball = createBall(scene, house.heightAt);
+const BALL_HOME = { x: -1.6, z: 0.6 };
+const life = createLife({ clock, villagers, heightAt: house.heightAt, danceSpots: house.radio.danceSpots, books: house.books, ball });
 life.start();
+
+// ---------- 알림: 화면 위에 잠깐 뜨는 한 줄 ----------
+const toastEl = document.createElement('div');
+Object.assign(toastEl.style, {
+  position: 'fixed', top: '64px', left: '50%', transform: 'translateX(-50%)', zIndex: '20',
+  padding: '10px 20px', borderRadius: '999px', background: 'rgba(255,250,240,.95)', color: '#5a4630',
+  boxShadow: '0 3px 0 #e8dcc4, 0 6px 14px rgba(0,0,0,.15)', font: "700 16px 'Malgun Gothic', sans-serif",
+  pointerEvents: 'none', opacity: '0', transition: 'opacity .4s', whiteSpace: 'nowrap',
+});
+document.body.appendChild(toastEl);
+let toastTimer = 0;
+function toast(text: string, sec = 4) {
+  toastEl.textContent = text;
+  toastEl.style.opacity = '1';
+  clearTimeout(toastTimer);
+  toastTimer = window.setTimeout(() => (toastEl.style.opacity = '0'), sec * 1000);
+}
+
+// ---------- 🐦 아침 손님: 매일 10:30~12:00 사이 한 번, 침실 창문에 새 ----------
+// 테스트용: 주소 뒤 ?bird=crow (sparrow | pigeon | crow | magpie) 면 그 새가 바로 찾아옴
+const birdParam = new URLSearchParams(location.search).get('bird') as BirdKind | null;
+let birdDay = -1; // 오늘 새 시각을 정한 날
+let birdAt = -1; // 오늘 새가 오는 게임 시각(분), -1 이면 오늘은 끝
+let birdBusy = false;
+function checkBird() {
+  if (clock.day !== birdDay) {
+    birdDay = clock.day;
+    birdAt = birdParam ? clock.minutes : 630 + Math.random() * 85; // 10:30 ~ 11:55
+  }
+  if (birdBusy || birdAt < 0 || clock.minutes < birdAt || cutscene || dialogue.isOpen) return;
+  if (clock.minutes >= 12 * 60 && !birdParam) {
+    birdAt = -1; // 이미 지나감
+    return;
+  }
+  birdAt = -1;
+  startBird(birdParam && BIRD_KINDS.includes(birdParam) ? birdParam : BIRD_KINDS[Math.floor(Math.random() * BIRD_KINDS.length)]);
+}
+
+function startBird(kind: BirdKind) {
+  if (birdBusy) return;
+  birdBusy = true;
+  runBirdVisit({
+    house, toast, playerName: PLAYER_NAMES[who],
+    villagers: Object.fromEntries(villagers.map((v) => [v.info.id, v])) as Record<VillagerId, Villager>,
+  }, kind).catch((e) => console.error(e)).finally(() => (birdBusy = false));
+}
 
 // ---------- 대화 ----------
 const TALK_DISTANCE = 1.7;
@@ -178,6 +230,8 @@ function nextTalk(v: Villager): { talk: Talk; friend?: string } {
   }
   if (v.drying) return { talk: v.info.drying };
   if (v.activity === 'dance') return { talk: v.info.dance };
+  if (v.activity === 'ball') return { talk: v.info.ball };
+  if (v.activity === 'read' && v.info.reading) return { talk: v.info.reading };
   if (washed && !heardAfterWash.has(v.info.id)) {
     heardAfterWash.add(v.info.id);
     return { talk: v.info.afterWash };
@@ -439,6 +493,16 @@ function update(dt: number, t: number) {
     house.setSunbeam(sunStrength(clock.minutes));
   }
   clockHud.update(clock);
+  checkBird();
+  // ⚽ 3일째 낮부터 소파 앞에 축구공 (게임 도중 생기면 알림)
+  if (!ball.visible && clock.day >= 3 && clock.minutes >= 6 * 60) {
+    ball.place(BALL_HOME.x, BALL_HOME.z);
+    if (t > 3) toast('⚽ 소파 앞에 축구공이 생겼어요!');
+  }
+  ball.update(dt, [
+    { pos: p, moving: !cutscene && (getMoveInput().x !== 0 || getMoveInput().y !== 0) },
+    ...villagers.filter((v) => v.walking && !v.scripted).map((v) => ({ pos: v.position, moving: true })),
+  ]);
   if (clock.isOver() && !cutscene && !dialogue.isOpen) passOut();
   if (dryUntil >= 0 && nowMinutes(clock) >= dryUntil && !cutscene && !dialogue.isOpen) dryDone();
 
@@ -483,9 +547,14 @@ function update(dt: number, t: number) {
 
   // 카메라와 그림자가 플레이어를 따라감 (집 앞 빈 공간이 너무 보이지 않게 앞쪽은 제한)
   const offset = CAMERA_OFFSET.clone().multiplyScalar(cameraOverride?.zoom ?? zoom);
+  // 새가 찾아온 동안 침실에 있으면 창문과 침대가 같이 보이게
+  const birdView = birdBusy && !cameraOverride && p.x < -7;
   const focus = cameraOverride
     ? cameraOverride.focus.clone()
-    : new THREE.Vector3(THREE.MathUtils.clamp(p.x, -15, 17), p.y, Math.min(p.z, 0.5));
+    : birdView
+      ? new THREE.Vector3(-16.5, 3.0, -2.6)
+      : new THREE.Vector3(THREE.MathUtils.clamp(p.x, -15, 17), p.y, Math.min(p.z, 0.5));
+  if (birdView) offset.multiplyScalar(0.75 / (cameraOverride ?? { zoom }).zoom);
   const camTarget = focus.clone().add(offset);
   if (snapCamera) camera.position.copy(camTarget);
   else camera.position.lerp(camTarget, Math.min(1, dt * (cameraOverride ? 2.5 : 5)));
@@ -510,7 +579,7 @@ function hitsVillager(x: number, z: number) {
 }
 
 // 개발 중 브라우저 콘솔에서 테스트용 (예: __game.talkTo(__game.villagers[0]))
-if (import.meta.env.DEV) Object.assign(window, { __game: { player, villagers, talkTo, dialogue, update, jump, goToSleep, clock, life, doLaundry, setRadio, openClaw } });
+if (import.meta.env.DEV) Object.assign(window, { __game: { player, villagers, talkTo, dialogue, update, jump, goToSleep, clock, life, doLaundry, setRadio, openClaw, bird: startBird } });
 
 camera.position.set(THREE.MathUtils.clamp(player.root.position.x, -15, 17), 0, Math.min(player.root.position.z, 0.5)).add(CAMERA_OFFSET.clone().multiplyScalar(zoom));
 tick();

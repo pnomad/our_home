@@ -36,7 +36,7 @@ export function createZzz() {
 }
 
 /** 머리 위 말풍선 */
-function createBubble() {
+export function createBubble() {
   const W = 440; // 주고받는 대사가 길어도 글자가 찌그러지지 않게 넉넉히
   const canvas = document.createElement('canvas');
   canvas.width = W;
@@ -77,7 +77,7 @@ export class Interrupt extends Error {}
 class Abort extends Error {}
 
 type Pose = 'stand' | 'lieSide' | 'lieBack';
-export type Activity = 'idle' | 'wander' | 'travel' | 'nap' | 'sunbathe' | 'fight' | 'prank' | 'chat' | 'napTogether' | 'dance';
+export type Activity = 'idle' | 'wander' | 'travel' | 'nap' | 'sunbathe' | 'fight' | 'prank' | 'chat' | 'napTogether' | 'dance' | 'bird' | 'read' | 'ball';
 
 /** 최근에 한 일 (대사에 쓰임) */
 export interface Memory {

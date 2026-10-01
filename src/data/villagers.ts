@@ -31,7 +31,7 @@ export interface VillagerInfo {
   walkSpeed: number; // 칸/초
   home: PlaceId; // 제일 좋아하는 자리
   // 성격: 할 일 고를 때의 비중 (클수록 자주)
-  likes: { sunbathe: number; nap: number; roam: number; visit: number; fight: number };
+  likes: { sunbathe: number; nap: number; roam: number; visit: number; fight: number; ball: number };
   greetings: { morning: Talk; day: Talk; night: Talk };
   wakeUp: Talk; // 자다가 깼을 때
   afterRaid: Talk; // 냉장고 털기 다음 날 처음 말 걸었을 때
@@ -39,13 +39,15 @@ export interface VillagerInfo {
   drying: Talk; // 빨래하고 건조대에서 마르는 중
   afterWash: Talk; // 다 마르고 처음 말 걸었을 때
   dance: Talk; // 라디오 틀어놓고 춤추는 중
+  ball: Talk; // 축구공으로 공놀이하는 중
+  reading?: Talk; // 소파에서 책 읽는 중 (감자)
   sunbathe: Talk[]; // 햇빛 받으며 빠삭하는 중
   memory: Partial<Record<MemoryTalkKind, Talk>>; // 방금 있었던 일
   places: Partial<Record<PlaceId, Talk[]>>; // 그 장소에 있을 때만
   talks: Talk[]; // 평소
   // 머리 위 말풍선
   // 머리 위 말풍선. 싸움은 fightStart(따지기) → fightBack(받아치기) → fight(아무 말) 순서
-  bubbles: { idle: string[]; chat: string[]; fight: string[]; fightStart: string[]; fightBack: string[]; sunbathe: string[]; dance: string[] };
+  bubbles: { idle: string[]; chat: string[]; fight: string[]; fightStart: string[]; fightBack: string[]; sunbathe: string[]; dance: string[]; kick: string[]; reading?: string[] };
 }
 
 const YES_NO = (yes: string[], no: string[]): Choice[] => [
@@ -61,7 +63,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     color: '#f2b233',
     walkSpeed: 1.6,
     home: 'table',
-    likes: { sunbathe: 3, nap: 0.6, roam: 3, visit: 3, fight: 0.6 },
+    likes: { sunbathe: 3, nap: 0.6, roam: 3, visit: 3, fight: 0.6, ball: 4 },
     greetings: {
       morning: { pages: ['일어났땅?! 나는 벌써 집 한 바퀴 돌았땅!'] },
       day: { pages: ['{이름} 왔땅! 마침 심심했땅. 나랑 놀자땅!'] },
@@ -76,6 +78,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     drying: { pages: ['세탁기 빙글빙글 너무 재밌었땅!!', '다 마르면 한 번 더 탔땅!'] },
     afterWash: { pages: ['뽀송뽀송해졌땅! 냄새 맡아봤땅?', '섬유유연제 냄새 났땅~ 헤헤.'] },
     dance: { pages: ['땅댄스 봤땅?! 팔 쫙 벌리는 게 포인트땅!', '{이름}도 같이 췄땅! 팔 벌렸땅!'] },
+    ball: { pages: ['공놀이 최고땅!', '내가 슛 쏘면 다 막지 못했땅! 대장이니까땅!'] },
     sunbathe: [
       { pages: ['빠삭빠삭했땅~', '햇빛 받으니까 털이 뽀송해졌땅!'] },
       { pages: ['{이름}도 여기 누웠땅!', '빠삭 자리는 내가 맡아놨땅. 첫째니까땅!'] },
@@ -114,6 +117,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       fightBack: ['아니에오! 땅!', '대장한테 덤볐땅?!', '나 아니었땅!'],
       sunbathe: ['빠삭~', '빠삭빠삭땅~ ☀️', '뽀송해졌땅~'],
       dance: ['땅댄스땅~!', '팔 쫙땅!', '흔들흔들땅~ ♪'],
+      kick: ['슛땅!', '패스땅~!', '받아랏땅!'],
     },
   },
 
@@ -124,7 +128,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     color: '#9d74d4',
     walkSpeed: 0.8,
     home: 'sofa',
-    likes: { sunbathe: 3, nap: 1, roam: 1, visit: 1.2, fight: 0.1 },
+    likes: { sunbathe: 3, nap: 1, roam: 1, visit: 1.2, fight: 0.1, ball: 0.8 },
     greetings: {
       morning: { pages: ['좋은 아침이었따몽. 아침은 챙겨 먹었따몽?'] },
       day: { pages: ['{이름} 왔따몽. 오늘도 잘 지냈따몽?'] },
@@ -136,6 +140,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     drying: { pages: ['세탁기 안에서 동생들 꼭 안고 있었따몽.', '이제 뽀송해지는 중이었따몽…'] },
     afterWash: { pages: ['깨끗해지니까 기분 좋았따몽.', '고마웠따몽. 다음엔 고양이한테 좀 살살 했따몽.'] },
     dance: { pages: ['흔들흔들… 형아도 춤 좀 췄따몽.', '말랑말랑 춤이었따몽. 따라 해봤따몽.'] },
+    ball: { pages: ['공이 자꾸 형아한테 굴러왔따몽.', '…다리가 짧아서 잘 못 찼따몽. 그래도 재밌었따몽.'] },
     sunbathe: [
       { pages: ['햇빛이 따뜻했따몽…', '이럴 때는 아무 생각 안 했따몽.'] },
       { pages: ['동생들이랑 같이 빠삭하니까 좋았따몽.', '{이름}도 누워봤따몽. 자리 있었따몽.'] },
@@ -173,6 +178,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       fightBack: ['아니에오!', '형아가 참았따몽…', '오해였따몽!'],
       sunbathe: ['따뜻했따몽…', '빠삭~', '말랑해졌따몽~'],
       dance: ['흔들흔들따몽~', '♪ 따몽따몽', '신났따몽!'],
+      kick: ['영차따몽…', '받았따몽!', '패스따몽~'],
     },
   },
 
@@ -183,7 +189,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     color: '#e89a3a',
     walkSpeed: 1.2,
     home: 'bed',
-    likes: { sunbathe: 6, nap: 3, roam: 1, visit: 1, fight: 0.4 },
+    likes: { sunbathe: 6, nap: 3, roam: 1, visit: 1, fight: 0.4, ball: 2.5 },
     greetings: {
       morning: { pages: ['하아암… 벌써 아침이었씨바…?', '오 분만 더 잤씨바…'] },
       day: { pages: ['{이름}! 반가웠씨바!'] },
@@ -195,6 +201,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     drying: { pages: ['…어지러웠씨바.', '그래도 여기 누워 있으니까 좋았씨바… 쿨…'] },
     afterWash: { pages: ['뽀송해졌씨바…', '뽀송하니까 또 졸렸씨바… 쿨…'] },
     dance: { pages: ['콩콩 뛰니까 신났씨바!', '…근데 이러다 또 졸렸씨바.'] },
+    ball: { pages: ['멍! 공이다씨바!', '공 쫓아가는 건 참을 수 없었씨바!'] },
     sunbathe: [
       { pages: ['빠삭~ 최고였씨바…', '여기서 평생 살았씨바…'] },
       { pages: ['햇빛 받으면 졸렸씨바…', '빠삭하다가 잠들면 더 좋았씨바… 쿨…'] },
@@ -233,6 +240,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       fightBack: ['아니에오!!', '나 아니었씨바!', '뭔일이래?!'],
       sunbathe: ['빠삭~', '빠삭빠삭씨바~ ☀️', '쿨… 빠삭…'],
       dance: ['콩콩씨바~!', '신났씨바! ♪', '멍멍~ ♫'],
+      kick: ['멍! 공이다!', '왈왈 슛!', '받았씨바!'],
     },
   },
 
@@ -243,7 +251,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     color: '#d4a86a',
     walkSpeed: 1.0,
     home: 'desk',
-    likes: { sunbathe: 3, nap: 0.6, roam: 1, visit: 1.2, fight: 0.3 },
+    likes: { sunbathe: 3, nap: 0.6, roam: 1, visit: 1.2, fight: 0.3, ball: 1.2 },
     greetings: {
       morning: { pages: ['좋은 아침이었감자!', '아침에 책 한 권 다 읽었감자.'] },
       day: { pages: ['{이름} 안녕했감자! 오늘은 뭐 배웠감자?'] },
@@ -255,6 +263,8 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     drying: { pages: ['드럼세탁기는 1분에 천 번 돌았감자.', '…다 세어봤감자. 어지러웠감자.'] },
     afterWash: { pages: ['빨래하고 나니까 털이 1.3배 부풀었감자.', '측정했감자. 과학이었감자!'] },
     dance: { pages: ['이 노래는 1분에 126박자였감자.', '박자 맞춰서 고개 까딱했감자. 과학이었감자!'] },
+    ball: { pages: ['공은 차는 각도가 중요했감자.', '45도로 찼는데… 소파 밑으로 들어갔감자.'] },
+    reading: { pages: ['쉿, 지금 책 읽었감자.', '오리가 바다를 건너는 이야기였감자. 주인공이 나랑 닮았감자!'] },
     sunbathe: [
       { pages: ['햇빛에는 비타민D가 있었감자.', '그래서 빠삭하면 똑똑해졌감자!'] },
       { pages: ['빠삭 온도를 재봤감자.', '…너무 따뜻해서 까먹었감자.'] },
@@ -291,6 +301,8 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
       fightBack: ['아니에오!', '증거 있었감자?!', '내가 맞았감자!'],
       sunbathe: ['빠삭~', '비타민D 충전감자 ☀️', '따뜻했감자~'],
       dance: ['까딱까딱감자~', '박자 맞췄감자! ♪', '♫ 감자감자'],
+      kick: ['45도 각도감자!', '패스했감자!', '과학적 슛감자!'],
+      reading: ['📖', '흠흠…', '그렇구나감자', '책에서 봤감자!', '(사락)'],
     },
   },
 };

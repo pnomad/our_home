@@ -63,6 +63,15 @@ export interface Rack {
   front: THREE.Vector3; // 건조대 앞 바닥
 }
 
+/** 침실 창문 (새가 찾아오는 곳) */
+export interface BedWindow {
+  sill: THREE.Vector3; // 창밖 창턱 가운데 (새가 앉는 자리)
+  ledgeZ: number; // 창 앞 헤드보드 윗면의 z (인형들이 올라서는 곳, 높이는 sill.y 와 같음)
+  x0: number;
+  x1: number;
+  latch: THREE.Object3D; // rotation.z = 0 열림, -π/2 잠김
+}
+
 /** 거실 테이블 위 라디오: 켜면 음표가 올라가고 인형들이 앞에 모여 춤춤 */
 export interface Radio {
   pos: THREE.Vector3; // 라디오 위치 (테이블 위)
@@ -92,6 +101,9 @@ export interface House {
   washer: Washer;
   rack: Rack;
   radio: Radio;
+  bedWindow: BedWindow;
+  /** 소파 위 책 두 권 (위에 있는 책이 마지막) + 감자가 앉아 읽는 자리 */
+  books: { items: THREE.Group[]; readSpot: THREE.Vector3 };
   /** 거실 컴퓨터 책상 (모니터 앞 의자 쪽). 여기서 [컴퓨터에서 게임하기] */
   computers: THREE.Vector3[];
   bed: Area; // 잘 자기 버튼이 뜨는 곳
@@ -110,6 +122,8 @@ const ROOMS = [
 ];
 const DOOR = { z0: 1, z1: 4.5 };
 const FRONT_DOOR = { z0: -2.8, z1: 0.2, h: 5.6 };
+/** 침실 창문 (헤드보드 바로 위). 벽이 뚫려 있어 창밖 창턱에 새가 앉는다 */
+const BED_WINDOW = { x0: -18.7, x1: -14.3, y0: 3.2, y1: 6.4, glassZ: -5.95, sillZ: -6.45 };
 
 function woodTexture() {
   const c = document.createElement('canvas');
@@ -179,7 +193,16 @@ export function createHouse(): House {
     floor.position.set((room.x0 + room.x1) / 2, 0, 0);
     floor.receiveShadow = true;
     group.add(floor);
-    box([room.x0, room.x1], [0, 8], [-6.5, -6], room.wall); // 뒷벽
+    if (room.name === '침실') {
+      // 뒷벽: 창문 자리만 뚫림
+      const W = BED_WINDOW;
+      box([room.x0, W.x0], [0, 8], [-6.5, -6], room.wall);
+      box([W.x1, room.x1], [0, 8], [-6.5, -6], room.wall);
+      box([W.x0, W.x1], [0, W.y0], [-6.5, -6], room.wall);
+      box([W.x0, W.x1], [W.y1, 8], [-6.5, -6], room.wall);
+    } else {
+      box([room.x0, room.x1], [0, 8], [-6.5, -6], room.wall); // 뒷벽
+    }
     box([room.x0, room.x1], [0, 0.4], [-6, -5.9], 0xffffff, false); // 걸레받이
   }
   // 바닥 앞 테두리 (인형의 집 단면)
@@ -195,8 +218,35 @@ export function createHouse(): House {
     box([x - 0.25, x + 0.25], [0, 1.6], [DOOR.z1, 6], 0xf4ede4);
     box([x - 0.25, x + 0.25], [6, 8], [DOOR.z0, DOOR.z1], 0xf4ede4, false); // 문틀 위
   }
-  // 창문 (침실, 거실)
-  for (const cx of [-16.5, 7]) {
+  // 침실 창문: 창밖 하늘 + 바깥 창턱(새 자리) + 흰 창틀 + 투명 유리 + 잠금 고리
+  const W = BED_WINDOW;
+  const wcx = (W.x0 + W.x1) / 2;
+  const sky = new THREE.Mesh(new THREE.PlaneGeometry(W.x1 - W.x0 + 1, W.y1 - W.y0 + 1), new THREE.MeshBasicMaterial({ color: 0xbfe6f7 }));
+  sky.position.set(wcx, (W.y0 + W.y1) / 2, -7.2);
+  group.add(sky);
+  box([W.x0 - 0.3, W.x1 + 0.3], [W.y0 - 0.15, W.y0], [-7.0, -6.0], 0xe8e2d8, false); // 바깥 창턱
+  box([W.x0 - 0.2, W.x0], [W.y0, W.y1], [-6.5, -5.9], 0xffffff, false); // 창틀 왼쪽
+  box([W.x1, W.x1 + 0.2], [W.y0, W.y1], [-6.5, -5.9], 0xffffff, false); // 오른쪽
+  box([W.x0 - 0.2, W.x1 + 0.2], [W.y1, W.y1 + 0.2], [-6.5, -5.9], 0xffffff, false); // 위
+  box([W.x0 - 0.2, W.x1 + 0.2], [W.y0, W.y0 + 0.12], [-6.0, -5.9], 0xffffff, false); // 아래 (안쪽 턱)
+  box([wcx - 0.08, wcx + 0.08], [W.y0 + 0.12, W.y1], [-5.97, -5.9], 0xffffff, false); // 가운데 창살
+  const windowGlass = new THREE.Mesh(
+    new THREE.PlaneGeometry(W.x1 - W.x0, W.y1 - W.y0 - 0.12),
+    new THREE.MeshLambertMaterial({ color: 0xd6eef8, transparent: true, opacity: 0.22, depthWrite: false }),
+  );
+  windowGlass.position.set(wcx, (W.y0 + 0.12 + W.y1) / 2, W.glassZ);
+  group.add(windowGlass);
+  // 잠금 고리: 창살 아래쪽, 돌리면 잠김
+  const latch = new THREE.Group();
+  latch.position.set(wcx, W.y0 + 0.45, -5.86);
+  const latchBase = new THREE.Mesh(new THREE.BoxGeometry(0.22, 0.14, 0.06), mat(0xc9b37e));
+  const latchLever = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.07, 0.05), mat(0xb89a5c));
+  latchLever.position.set(0.12, 0, 0.04);
+  latch.add(latchBase, latchLever);
+  group.add(latch);
+
+  // 창문 (거실)
+  for (const cx of [7]) {
     box([cx - 2.2, cx + 2.2], [3.2, 6.4], [-6, -5.9], 0xffffff, false);
     box([cx - 2, cx + 2], [3.4, 6.2], [-5.9, -5.85], 0xbfe6f7, false);
     box([cx - 0.08, cx + 0.08], [3.4, 6.2], [-5.85, -5.8], 0xffffff, false);
@@ -235,6 +285,21 @@ export function createHouse(): House {
   rug.position.set(-1.5, 0.01, -0.5);
   rug.receiveShadow = true;
   group.add(rug);
+  // 소파 위 책 두 권 (오른쪽 끝에 쌓아 둠). 감자가 가져다 읽는다
+  const books: THREE.Group[] = [];
+  for (const [i, cover] of [[0, 0xd9604c], [1, 0x5b8fc9]] as const) {
+    const book = new THREE.Group();
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.72, 0.13, 0.55), mat(cover));
+    const pages = new THREE.Mesh(new THREE.BoxGeometry(0.68, 0.1, 0.52), mat(0xfbf7ec));
+    pages.position.set(0.03, 0, 0);
+    c.castShadow = true;
+    book.add(c, pages);
+    book.position.set(0.95, 1.5 + 0.065 + i * 0.13, -3.35);
+    book.rotation.y = i ? 0.25 : -0.1;
+    group.add(book);
+    books.push(book);
+  }
+
   // 거실 테이블 (소파 앞 러그 위, 낮은 원목 테이블) + 라디오
   const TABLE = { x0: 0.4, x1: 2.8, z0: -1.3, z1: 0.1, top: 1.2 };
   box([TABLE.x0, TABLE.x1], [TABLE.top - 0.15, TABLE.top], [TABLE.z0, TABLE.z1], 0xc79a6b); // 상판
@@ -612,6 +677,8 @@ export function createHouse(): House {
     updateFade,
     radio,
     computers,
+    bedWindow: { sill: new THREE.Vector3(wcx, W.y0, W.sillZ), ledgeZ: -5.72, x0: W.x0, x1: W.x1, latch },
+    books: { items: books, readSpot: new THREE.Vector3(0.1, 1.5, -3.5) },
     fridge: { setOpen, light, tray, trayHome, front: new THREE.Vector3(21.25, 0, -2.0) },
     frontDoor: {
       setOpen: (k: number) => (frontDoorPivot.rotation.y = 1.7 * k),

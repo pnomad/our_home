@@ -24,10 +24,11 @@ function saveDay(day: number) {
 }
 
 export function createClock() {
-  // 테스트용: 주소 뒤 ?night=1 이면 밤 9시, ?time=18.5 면 오후 6시 반에서 시작 (새벽 1시 = 25)
+  // 테스트용: 주소 뒤 ?night=1 이면 밤 9시, ?time=18.5 면 오후 6시 반에서 시작 (새벽 1시 = 25), ?day=3 이면 3일째
   const q = new URLSearchParams(location.search);
   const startAt = q.get('night') === '1' ? NIGHT_START : Number(q.get('time')) * 60 || DAY_START;
-  const state = { day: loadDay(), minutes: Math.min(Math.max(startAt, DAY_START), DAY_END) };
+  // 테스트용: ?day=3 이면 3일째로 시작 (저장된 날짜는 안 바꿈)
+  const state = { day: Number(q.get('day')) || loadDay(), minutes: Math.min(Math.max(startAt, DAY_START), DAY_END) };
 
   return {
     get day() {

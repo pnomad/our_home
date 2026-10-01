@@ -3,9 +3,12 @@
 //   낮잠, 집 안 돌아다니기, 형제 찾아가서 싸움 / 장난 / 같이 낮잠 / 수다
 //   밤 10시 이후: 침대나 소파에서 잠
 //   📻 라디오가 켜져 있으면: 다 같이 거실 테이블 앞에 모여 춤
+//   📖 감자는 소파 위 책을 가져다 읽음
+//   ⚽ 축구공이 있으면 (3일째부터) 둘이 패스하거나 혼자 뻥뻥
 import * as THREE from 'three';
 import { Villager, rand } from './villager';
-import { HANGOUTS, randomSpot, type PlaceId } from '../world/places';
+import { HANGOUTS, randomSpot, nearestPlace, type PlaceId } from '../world/places';
+import type { Ball } from '../world/ball';
 import { pick, CHATS } from '../data/villagers';
 import type { GameClock } from '../world/clock';
 
@@ -15,6 +18,10 @@ export interface LifeContext {
   heightAt(x: number, z: number): number;
   /** 라디오 앞 춤추는 자리 (인형 수만큼, 거실 바닥) */
   danceSpots: THREE.Vector3[];
+  /** 소파 위 책 (위에 있는 게 마지막) + 앉아 읽는 자리 */
+  books: { items: THREE.Object3D[]; readSpot: THREE.Vector3 };
+  /** 축구공 (보이지 않으면 아직 없음) */
+  ball: Ball;
 }
 
 const SUN_START = 10 * 60;
@@ -137,6 +144,129 @@ export function createLife(ctx: LifeContext) {
       v.dancing = false;
       v.setPose('stand');
     }
+  }
+
+  // ---------- 📖 감자의 독서 ----------
+
+  /** 소파 위 책을 한 권 들고 그 자리에서 읽음 (펼친 책을 몸 앞에 듦) */
+  async function readBook(v: Villager) {
+    const { items, readSpot } = ctx.books;
+    const book = [...items].reverse().find((b) => b.visible);
+    if (!book) return hangOut(v, v.info.home, 1);
+    v.activity = 'travel';
+    await v.goTo('sofa');
+    if (radioOn) return;
+    await v.walkTo(readSpot.clone());
+    v.char.root.rotation.y = 0; // 앞을 보고 앉음
+    book.visible = false;
+    const open = openBookMesh(((book.children[0] as THREE.Mesh).material as THREE.MeshLambertMaterial).color.getHex());
+    v.char.body.add(open);
+    v.activity = 'read';
+    v.say('📖', 1.5);
+    try {
+      const end = now() + rand(40, 80);
+      while (now() < end && !radioOn) {
+        await v.wait(rand(4, 7));
+        // 책장 넘김
+        const page = open.getObjectByName('page')!;
+        let t = 0;
+        await v.frames((dt) => ((page.rotation.z = Math.PI * Math.min(1, (t += dt) / 0.5)), t >= 0.5));
+        page.rotation.z = 0;
+        if (Math.random() < 0.5) v.say(pick(v.info.bubbles.reading ?? ['📖']), 2);
+      }
+      v.remember('chat', now());
+    } finally {
+      open.removeFromParent();
+      book.visible = true;
+    }
+  }
+
+  // ---------- ⚽ 공놀이 ----------
+
+  /** 공 뒤로 돌아가서 target 쪽으로 뻥 */
+  async function kickToward(v: Villager, target: THREE.Vector3) {
+    const ball = ctx.ball;
+    for (let tries = 0; tries < 3; tries++) {
+      if (ball.speed > 0.4) await v.wait(0.4); // 굴러가는 중이면 조금 기다림
+      const b = ball.pos;
+      const dir = new THREE.Vector3(target.x - b.x, 0, target.z - b.z);
+      if (dir.lengthSq() < 0.01) dir.set(0, 0, 1);
+      dir.normalize();
+      const behind = new THREE.Vector3(b.x, 0, b.z).addScaledVector(dir, -(ball.radius + 0.45));
+      if (ctx.heightAt(behind.x, behind.z) > 0.02) behind.set(b.x, 0, b.z).addScaledVector(dir, ball.radius + 0.45); // 뒤가 막혔으면 앞에서
+      await v.walkTo(behind, v.info.walkSpeed * 1.5);
+      if (Math.hypot(v.position.x - b.x, v.position.z - b.z) > ball.radius + 0.8) continue; // 공이 굴러가 버림 → 다시
+      v.char.root.rotation.y = Math.atan2(dir.x, dir.z);
+      v.say(pick(v.info.bubbles.kick), 1.4);
+      const dist = Math.hypot(target.x - b.x, target.z - b.z);
+      ball.kick(dir.x, dir.z, Math.min(5, Math.sqrt(2 * 1.6 * dist) + 0.4));
+      await v.wait(0.3);
+      return;
+    }
+  }
+
+  /** 공이 멈추거나(거의) 내 근처로 올 때까지 */
+  async function waitForBall(v: Villager, maxSec: number) {
+    let t = 0;
+    await v.frames((dt) => (t += dt) > maxSec || ctx.ball.speed < 0.25 || ctx.ball.pos.distanceTo(v.position) < 1.2);
+  }
+
+  /** 공이 있는 바닥 장소로 */
+  async function goToBall(v: Villager) {
+    v.activity = 'travel';
+    const p = ctx.ball.pos;
+    await v.goTo(nearestPlace(new THREE.Vector3(p.x, 0, p.z)), 1.3);
+  }
+
+  /** 혼자 공 뻥뻥 */
+  async function soloBall(v: Villager) {
+    await goToBall(v);
+    v.activity = 'ball';
+    for (let i = 0; i < 3 && !radioOn; i++) {
+      const p = ctx.ball.pos;
+      const a = Math.random() * Math.PI * 2;
+      await kickToward(v, new THREE.Vector3(p.x + Math.cos(a) * 4, 0, p.z + Math.sin(a) * 4));
+      await waitForBall(v, 3);
+    }
+  }
+
+  /** 둘이 패스 */
+  async function passBall(a: Villager, b: Villager) {
+    a.engaged = b.engaged = true;
+    b.interrupt();
+    try {
+      b.setPose('stand');
+      a.say(a.info.id === 'ddangi' ? '공놀이하자땅!' : '공놀이할래?', 1.8);
+      await Promise.all([goToBall(a), goToBall(b)]);
+      a.activity = b.activity = 'ball';
+      // b 는 공에서 3~4칸 떨어진 빈 바닥으로
+      const p = ctx.ball.pos;
+      for (let i = 0; i < 10; i++) {
+        const ang = Math.random() * Math.PI * 2, d = rand(3, 4);
+        const spot = new THREE.Vector3(p.x + Math.cos(ang) * d, 0, p.z + Math.sin(ang) * d);
+        if (ctx.heightAt(spot.x, spot.z) === 0) {
+          await b.walkTo(spot);
+          break;
+        }
+      }
+      let [kicker, receiver] = [a, b];
+      for (let i = 0; i < 6 && !radioOn; i++) {
+        await kickToward(kicker, receiver.position);
+        await waitForBall(receiver, 3.5);
+        if (Math.random() < 0.4) receiver.say(pick(receiver.info.bubbles.kick), 1.4);
+        [kicker, receiver] = [receiver, kicker];
+      }
+      a.remember('chat', now(), b);
+      b.remember('chat', now(), a);
+    } finally {
+      a.engaged = b.engaged = false;
+    }
+  }
+
+  async function playBall(v: Villager) {
+    const partner = villagers.find((o) => o !== v && available(o) && !o.isSleeping && o.position.distanceTo(v.position) < 12 && Math.random() < o.info.likes.ball / 4);
+    if (partner) await passBall(v, partner);
+    else await soloBall(v);
   }
 
   // ---------- 형제와 어울리기 ----------
@@ -326,12 +456,19 @@ export function createLife(ctx: LifeContext) {
       [others.length ? likes.visit * 1.5 : 0, () => visit(v, pick(others))],
       [nearby.length ? 4 + likes.visit : 0, () => visit(v, pick(nearby))],
       [v.info.id === 'ddangi' ? 0.6 : 0.1, () => hangOut(v, 'fridge', 2)], // 냉장고 기웃기웃
+      [v.info.id === 'gamja' ? 2.5 : 0, () => readBook(v)], // 감자는 소파에서 책
+      [ctx.ball.visible ? likes.ball : 0, () => playBall(v)],
     ]);
     await plan();
   }
 
   return {
     log,
+    /** 테스트용: v 가 다음에 책을 읽음 */
+    queueRead(v: Villager) {
+      queued.set(v, () => readBook(v));
+      v.interrupt();
+    },
     /** 테스트용: a 가 다음에 b 를 찾아가게 함 */
     queueVisit(a: Villager, b: Villager) {
       queued.set(a, () => visit(a, b));
@@ -351,6 +488,33 @@ export function createLife(ctx: LifeContext) {
       }
     },
   };
+}
+
+/** 몸 앞에 드는 펼친 책 (넘기는 책장은 name = 'page') */
+function openBookMesh(cover: number) {
+  const g = new THREE.Group();
+  g.position.set(0, 0.42, 0.42);
+  g.rotation.x = -0.9; // 얼굴 쪽으로 기울여 듦
+  const coverMat = new THREE.MeshLambertMaterial({ color: cover });
+  const pageMat = new THREE.MeshLambertMaterial({ color: 0xfbf7ec });
+  for (const side of [-1, 1]) {
+    const c = new THREE.Mesh(new THREE.BoxGeometry(0.34, 0.03, 0.46), coverMat);
+    c.position.set(side * 0.17, 0, 0);
+    c.rotation.z = side * 0.18;
+    const pg = new THREE.Mesh(new THREE.BoxGeometry(0.31, 0.03, 0.43), pageMat);
+    pg.position.set(side * 0.16, 0.025, 0);
+    pg.rotation.z = side * 0.18;
+    g.add(c, pg);
+  }
+  // 넘어가는 책장: 오른쪽에서 가운데를 축으로 왼쪽으로
+  const page = new THREE.Group();
+  page.name = 'page';
+  page.position.set(0, 0.045, 0);
+  const sheet = new THREE.Mesh(new THREE.BoxGeometry(0.3, 0.008, 0.42), pageMat);
+  sheet.position.x = 0.15;
+  page.add(sheet);
+  g.add(page);
+  return g;
 }
 
 /** 햇빛 세기 (0~1): 10시쯤 들어오기 시작해서 4시쯤 사라짐 */
