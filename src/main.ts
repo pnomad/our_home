@@ -19,6 +19,7 @@ import { runQuietNight, NARRATOR, type EventContext } from './events/common';
 import { getMoveInput } from './input';
 import { createRadioMusic } from './world/radioMusic';
 import { runBirdVisit } from './events/birdVisit';
+import { runSockStory, takeOffSocks } from './events/sockStory';
 import { createBall } from './world/ball';
 import { BIRD_KINDS, type BirdKind } from './entities/birds';
 
@@ -148,7 +149,7 @@ function checkBird() {
     birdDay = clock.day;
     birdAt = birdParam ? clock.minutes : 630 + Math.random() * 85; // 10:30 ~ 11:55
   }
-  if (birdBusy || birdAt < 0 || clock.minutes < birdAt || cutscene || dialogue.isOpen) return;
+  if (birdBusy || sockBusy || birdAt < 0 || clock.minutes < birdAt || cutscene || dialogue.isOpen) return;
   if (clock.minutes >= 12 * 60 && !birdParam) {
     birdAt = -1; // 이미 지나감
     return;
@@ -164,6 +165,40 @@ function startBird(kind: BirdKind) {
     house, toast, playerName: PLAYER_NAMES[who],
     villagers: Object.fromEntries(villagers.map((v) => [v.info.id, v])) as Record<VillagerId, Villager>,
   }, kind).catch((e) => console.error(e)).finally(() => (birdBusy = false));
+}
+
+// ---------- 🧦 4일째 점심 전 양말 소동 (한 번만) ----------
+// 테스트용: ?story=sock 이면 아무 날이나 바로
+const SOCK_KEY = 'our-house:sock-done';
+const storyParam = new URLSearchParams(location.search).get('story');
+let sockBusy = false;
+let sockDay = -1; // 양말 소동이 있었던 날 (그날은 양말 이야기)
+const heardSock = new Set<VillagerId>();
+function sockDone() {
+  try {
+    return localStorage.getItem(SOCK_KEY) === '1';
+  } catch {
+    return false;
+  }
+}
+function checkSock() {
+  if (sockBusy || birdBusy || cutscene || dialogue.isOpen || sockDay >= 0) return;
+  const due = storyParam === 'sock' || (clock.day === 4 && clock.minutes >= 9 * 60 + 20 && clock.minutes < 12 * 60 && !sockDone());
+  if (!due) return;
+  sockBusy = true;
+  cutscene = true;
+  actionButton.show(null);
+  runSockStory(eventContext()).catch((e) => console.error(e)).finally(() => {
+    sockBusy = false;
+    cutscene = false;
+    sockDay = clock.day;
+    heardSock.clear();
+    try {
+      localStorage.setItem(SOCK_KEY, '1');
+    } catch {
+      // 저장이 막힌 브라우저면 그냥 넘어감
+    }
+  });
 }
 
 // ---------- 대화 ----------
@@ -230,6 +265,10 @@ function nextTalk(v: Villager): { talk: Talk; friend?: string } {
   }
   if (v.drying) return { talk: v.info.drying };
   if (v.activity === 'dance') return { talk: v.info.dance };
+  if (sockDay === clock.day && !heardSock.has(v.info.id)) {
+    heardSock.add(v.info.id);
+    return { talk: v.info.afterSock };
+  }
   if (v.activity === 'ball') return { talk: v.info.ball };
   if (v.activity === 'read' && v.info.reading) return { talk: v.info.reading };
   if (washed && !heardAfterWash.has(v.info.id)) {
@@ -418,6 +457,7 @@ async function sleepAndRaid() {
   cutscene = true;
   actionButton.show(null);
   setRadio(false); // 잘 때는 라디오 끔
+  takeOffSocks(villagers); // 양말(모자)도 벗고 잠
   if (dryUntil >= 0) await dryDone(true); // 건조대에 널린 채로 밤이 되면 그냥 다 마른 걸로
   const night = pickNightEvent();
   const ctx = eventContext();
@@ -494,6 +534,7 @@ function update(dt: number, t: number) {
   }
   clockHud.update(clock);
   checkBird();
+  checkSock();
   // ⚽ 3일째 낮부터 소파 앞에 축구공 (게임 도중 생기면 알림)
   if (!ball.visible && clock.day >= 3 && clock.minutes >= 6 * 60) {
     ball.place(BALL_HOME.x, BALL_HOME.z);

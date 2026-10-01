@@ -40,6 +40,7 @@ export interface VillagerInfo {
   afterWash: Talk; // 다 마르고 처음 말 걸었을 때
   dance: Talk; // 라디오 틀어놓고 춤추는 중
   ball: Talk; // 축구공으로 공놀이하는 중
+  afterSock: Talk; // 4일째 양말 소동 뒤 처음 말 걸었을 때
   reading?: Talk; // 소파에서 책 읽는 중 (감자)
   sunbathe: Talk[]; // 햇빛 받으며 빠삭하는 중
   memory: Partial<Record<MemoryTalkKind, Talk>>; // 방금 있었던 일
@@ -79,6 +80,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     afterWash: { pages: ['뽀송뽀송해졌땅! 냄새 맡아봤땅?', '섬유유연제 냄새 났땅~ 헤헤.'] },
     dance: { pages: ['땅댄스 봤땅?! 팔 쫙 벌리는 게 포인트땅!', '{이름}도 같이 췄땅! 팔 벌렸땅!'] },
     ball: { pages: ['공놀이 최고땅!', '내가 슛 쏘면 다 막지 못했땅! 대장이니까땅!'] },
+    afterSock: { pages: ['감자가 내 모자 가져갔땅!!', '그거 모자 맞았땅! 머리에 딱 맞았땅!', '…{이름}도 모자라고 생각했땅?'], choices: [{ label: '마다오', reply: ['그치땅?! 역시 내 편이땅!'] }, { label: '아니에오', reply: ['…양말이었땅? 흥, 그래도 모자땅!'] }] },
     sunbathe: [
       { pages: ['빠삭빠삭했땅~', '햇빛 받으니까 털이 뽀송해졌땅!'] },
       { pages: ['{이름}도 여기 누웠땅!', '빠삭 자리는 내가 맡아놨땅. 첫째니까땅!'] },
@@ -141,6 +143,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     afterWash: { pages: ['깨끗해지니까 기분 좋았따몽.', '고마웠따몽. 다음엔 고양이한테 좀 살살 했따몽.'] },
     dance: { pages: ['흔들흔들… 형아도 춤 좀 췄따몽.', '말랑말랑 춤이었따몽. 따라 해봤따몽.'] },
     ball: { pages: ['공이 자꾸 형아한테 굴러왔따몽.', '…다리가 짧아서 잘 못 찼따몽. 그래도 재밌었따몽.'] },
+    afterSock: { pages: ['양말은 두 짝이었따몽.', '…나는 발이 없어서 구경만 했따몽.', '그래도 동생들이 신나서 좋았따몽.'] },
     sunbathe: [
       { pages: ['햇빛이 따뜻했따몽…', '이럴 때는 아무 생각 안 했따몽.'] },
       { pages: ['동생들이랑 같이 빠삭하니까 좋았따몽.', '{이름}도 누워봤따몽. 자리 있었따몽.'] },
@@ -202,6 +205,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     afterWash: { pages: ['뽀송해졌씨바…', '뽀송하니까 또 졸렸씨바… 쿨…'] },
     dance: { pages: ['콩콩 뛰니까 신났씨바!', '…근데 이러다 또 졸렸씨바.'] },
     ball: { pages: ['멍! 공이다씨바!', '공 쫓아가는 건 참을 수 없었씨바!'] },
+    afterSock: { pages: ['이 모자 따뜻했씨바…', '감자가 양말이라고 했씨바. …그래도 모자로 쓸 거였씨바.'] },
     sunbathe: [
       { pages: ['빠삭~ 최고였씨바…', '여기서 평생 살았씨바…'] },
       { pages: ['햇빛 받으면 졸렸씨바…', '빠삭하다가 잠들면 더 좋았씨바… 쿨…'] },
@@ -264,6 +268,7 @@ export const VILLAGERS: Record<VillagerId, VillagerInfo> = {
     afterWash: { pages: ['빨래하고 나니까 털이 1.3배 부풀었감자.', '측정했감자. 과학이었감자!'] },
     dance: { pages: ['이 노래는 1분에 126박자였감자.', '박자 맞춰서 고개 까딱했감자. 과학이었감자!'] },
     ball: { pages: ['공은 차는 각도가 중요했감자.', '45도로 찼는데… 소파 밑으로 들어갔감자.'] },
+    afterSock: { pages: ['양말은 발에 신는 거였감자. 내 발에 딱 맞았감자!', '땅이 형아가 계속 쫓아왔감자.', '…한 짝만 신으니까 좀 기우뚱했감자.'] },
     reading: { pages: ['쉿, 지금 책 읽었감자.', '오리가 바다를 건너는 이야기였감자. 주인공이 나랑 닮았감자!'] },
     sunbathe: [
       { pages: ['햇빛에는 비타민D가 있었감자.', '그래서 빠삭하면 똑똑해졌감자!'] },
