@@ -44,6 +44,8 @@ export function spawnPrize(
   const common = {
     friction: def.friction, restitution: def.restitution, groups: GROUP_PRIZE,
     core: def.category === 'plush' ? PLUSH_CORE : 1,
+    // 인형은 부품을 녹여 붙인 한 겹 천으로 보이게 (이음새 두께는 인형 크기에 비례)
+    melt: def.category === 'plush' ? def.size * 0.14 : undefined,
   };
 
   const main = world.createRigidBody(

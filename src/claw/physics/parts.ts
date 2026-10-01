@@ -1,6 +1,7 @@
 import * as THREE from 'three';
 import { RoundedBoxGeometry } from 'three/examples/jsm/geometries/RoundedBoxGeometry.js';
 import { RAPIER } from './world';
+import { meltedPlushGeometry, plushFabric } from './plushMesh';
 
 export type V3 = [number, number, number];
 
@@ -142,14 +143,27 @@ export function attachParts(
   world: RAPIER.World,
   body: RAPIER.RigidBody,
   parts: Part[],
-  opts: { mass: number; friction: number; restitution: number; groups: number; core?: number },
+  opts: { mass: number; friction: number; restitution: number; groups: number; core?: number; melt?: number },
 ): { group: THREE.Group; colliders: RAPIER.Collider[] } {
   const group = new THREE.Group();
   const colliders: RAPIER.Collider[] = [];
   const solid = parts.filter((p) => !p.visualOnly);
   const totalVol = solid.reduce((a, p) => a + shapeVolume(p.shape), 0) || 1;
+  // 인형 천 부분은 녹여 붙인 한 덩어리로 (눈·코 같은 작은 플라스틱 부품은 따로)
+  const fabric = opts.melt ? parts.filter((p) => p.mat === 'plush' && !p.geometry) : [];
+  if (fabric.length) {
+    const mesh = new THREE.Mesh(meltedPlushGeometry(fabric, opts.melt!), plushFabric);
+    mesh.castShadow = true;
+    mesh.receiveShadow = true;
+    group.add(mesh);
+  }
   for (const p of parts) {
-    group.add(meshFor(p));
+    if (!fabric.includes(p)) {
+      const mesh = meshFor(p);
+      // 녹여 붙인 인형의 눈·코: 구슬처럼 튀어나오지 않게 납작한 단추로 (얼굴은 +z 쪽)
+      if (opts.melt && p.visualOnly && p.mat !== 'plush' && p.shape.type === 'ball') mesh.scale.z = 0.45;
+      group.add(mesh);
+    }
     if (p.visualOnly) continue;
     const desc = colliderDesc(shrinkShape(p.shape, opts.core ?? 1))
       .setTranslation(...(p.pos ?? [0, 0, 0]))
