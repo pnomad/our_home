@@ -9,7 +9,7 @@ import * as THREE from 'three';
 import type { Villager } from '../entities/villager';
 import type { VillagerId } from '../entities/styles';
 import { sayer, tween, face, hop, walk, wait, type EventContext } from './common';
-import { createSock, takeOffSocks, wearOnHead, wearOnFoot, wearOnEar, wearAsScarf, putSock } from './sockStory';
+import { createSock, takeOffSocks, wearOnHead, wearOnFoot, wearOnEar, wearAsScarf, carryOnHead } from './sockStory';
 
 const BED_Y = 1.6;
 const SOFA_Y = 1.5;
@@ -231,10 +231,7 @@ export async function runSockFashion(ctx: EventContext) {
   face(player.root, STAGE);
   // 땅이 머리 위에 양말 탑 (파랑 · 노랑 · 초록)
   const extra = [createSock(0x5b8fc9), createSock(0xf2c14e), createSock(0x6fbf73)];
-  extra.forEach((s, i) => {
-    wearOnHead(V.ddangi, s, (i - 1) * 0.3);
-    s.position.y += i * 0.18;
-  });
+  extra.forEach((s, i) => carryOnHead(V.ddangi, s, i));
   ctx.setNameTags(true);
   ctx.setCamera(new THREE.Vector3(-1.6, 0.7, 1.6), 0.66, true);
   await wait(0.4);
