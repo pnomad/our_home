@@ -35,6 +35,8 @@ const LINES: Record<Exclude<BirdKind, 'crow'>, Line[]> = {
   pigeon: [
     ['bird', '구구구…'],
     ['ddangi', '구구 왔땅! 오늘도 놀러 왔땅?'],
+    ['ddangi', '은우빌에서부터 친하게 지낸 비둘씨야.'], // 말풍선은 한 줄이라 두 번에 나눠 말함
+    ['ddangi', '이사와도 잘 찾아왔땅'],
     ['gamja', '비둘기는 길을 잘 찾았감자. 책에서 봤감자!'],
     ['bird', '구구!'],
     ['ddangi', '그래서 우리 집도 잘 찾아왔땅!'],
