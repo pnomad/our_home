@@ -10,9 +10,9 @@ import { sayer, tween, face, hop, walk, wait, heightOf, type EventContext } from
 
 const SOCK = 'sock';
 
-/** 줄무늬 니트 양말 (세워 둔 모양: 발목이 위, 발끝이 +z) */
-function createSock() {
-  const W = 0xf6f3ec, R = 0xe2574c;
+/** 줄무늬 니트 양말 (세워 둔 모양: 발목이 위, 발끝이 +z). stripe 로 줄무늬 색을 바꿈 */
+export function createSock(stripe = 0xe2574c) {
+  const W = 0xf6f3ec, R = stripe;
   const parts: Blob[] = [
     { c: [0, 0.34, 0], r: [0.12, 0.28, 0.1], color: W }, // 발목
     { c: [0, 0.6, 0], r: [0.125, 0.06, 0.105], color: R }, // 목 고무단
@@ -26,25 +26,63 @@ function createSock() {
   mesh.castShadow = true;
   const g = new THREE.Group();
   g.name = SOCK;
+  g.userData.stripe = stripe;
   g.add(mesh);
   return g;
 }
 
-/** 머리 위에 모자처럼 (살짝 기울어짐) */
-function wearOnHead(v: Villager, sock: THREE.Object3D, tilt: number) {
-  const top = heightOf(v.char) - 0.08;
-  v.char.body.attach(sock);
-  sock.position.set(0, top, -0.05);
-  sock.rotation.set(0, 0, tilt);
-  sock.scale.setScalar(0.85);
+/** 양말을 parent 의 (pos, rot, scale) 자리로. sec > 0 이면 휙 날아가듯 옮김 */
+export async function putSock(sock: THREE.Object3D, parent: THREE.Object3D, pos: THREE.Vector3, rot: THREE.Euler, scale: number, sec = 0) {
+  parent.attach(sock);
+  const q1 = new THREE.Quaternion().setFromEuler(rot);
+  if (sec <= 0) {
+    sock.position.copy(pos);
+    sock.quaternion.copy(q1);
+    sock.scale.setScalar(scale);
+    return;
+  }
+  const p0 = sock.position.clone(), q0 = sock.quaternion.clone(), s0 = sock.scale.x;
+  await tween(sec, (k) => {
+    sock.position.lerpVectors(p0, pos, k);
+    sock.position.y += Math.sin(k * Math.PI) * 0.5;
+    sock.quaternion.slerpQuaternions(q0, q1, k);
+    sock.scale.setScalar(s0 + (scale - s0) * k);
+  });
 }
 
-/** 오른발에 신음 (감자: 발이 몸 앞쪽 아래) */
-function wearOnFoot(v: Villager, sock: THREE.Object3D) {
-  v.char.body.attach(sock);
-  sock.position.set(0.2, 0, 0.3);
-  sock.rotation.set(0, -0.3, 0);
-  sock.scale.setScalar(0.7);
+/** 양말을 뺀 인형 키 (이미 쓴 양말까지 키로 재면 모자가 점점 높이 뜸) */
+function bareHeight(v: Villager) {
+  const worn = v.char.body.children.filter((c) => c.name === SOCK);
+  for (const s of worn) s.removeFromParent();
+  const h = heightOf(v.char);
+  for (const s of worn) v.char.body.add(s);
+  return h;
+}
+
+/** 머리 위에 모자처럼 (살짝 기울어짐) */
+export function wearOnHead(v: Villager, sock: THREE.Object3D, tilt: number, sec = 0) {
+  const top = bareHeight(v) - 0.08;
+  return putSock(sock, v.char.body, new THREE.Vector3(0, top, -0.05), new THREE.Euler(0, 0, tilt), 0.85, sec);
+}
+
+/** 발에 신음 (감자: 발이 몸 앞쪽 아래). side 1 = 오른발, -1 = 왼발 */
+export function wearOnFoot(v: Villager, sock: THREE.Object3D, side = 1, sec = 0) {
+  return putSock(sock, v.char.body, new THREE.Vector3(0.2 * side, 0, 0.3), new THREE.Euler(0, -0.3 * side, 0), 0.7, sec);
+}
+
+/** 오른쪽 귀에 거꾸로 대롱대롱 (시바: 귀는 머리 위 앞쪽) */
+export function wearOnEar(v: Villager, sock: THREE.Object3D, sec = 0) {
+  const top = bareHeight(v);
+  return putSock(sock, v.char.body, new THREE.Vector3(0.55, top + 0.05, 0.3), new THREE.Euler(0, 0, Math.PI + 0.35), 0.75, sec);
+}
+
+/** 목도리처럼 몸 앞에 가로로 두르고 발 부분은 아래로 늘어뜨림 (따몽) */
+const SCARF = new THREE.Euler().setFromRotationMatrix(new THREE.Matrix4().makeBasis(
+  new THREE.Vector3(0, 0, -1), new THREE.Vector3(1, 0, 0), new THREE.Vector3(0, -1, 0), // 발목 → 오른쪽, 발끝 → 아래
+));
+export function wearAsScarf(v: Villager, sock: THREE.Object3D, sec = 0) {
+  const h = bareHeight(v);
+  return putSock(sock, v.char.body, new THREE.Vector3(-0.36, h * 0.58, 0.58), SCARF, 1.0, sec);
 }
 
 /** 잘 때 양말 벗기 */

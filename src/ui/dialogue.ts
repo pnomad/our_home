@@ -86,7 +86,7 @@ export class DialogueBox {
   }
 
   /** 대사 묶음들을 차례로 끝까지 재생 */
-  async play(speaker: Speaker, talks: Talk[]) {
+  async play(speaker: Speaker, talks: Talk[]): Promise<Choice | null> {
     clearTimeout(this.closeTimer); // 대사를 연달아 띄울 때 앞 대화의 닫기 예약 취소
     this.isOpen = true;
     this.nameEl.innerHTML = `<small>${speaker.order}</small>${speaker.name}`;
@@ -95,6 +95,7 @@ export class DialogueBox {
     this.textEl.style.fontStyle = speaker.name ? '' : 'italic';
     this.root.classList.add('show');
 
+    let picked: Choice | null = null; // 마지막으로 고른 대답
     for (const talk of talks) {
       const pages = talk.pages;
       for (let i = 0; i < pages.length; i++) {
@@ -103,6 +104,7 @@ export class DialogueBox {
       }
       if (talk.choices) {
         const choice = await this.ask(talk.choices);
+        picked = choice;
         for (const page of choice.reply) await this.showPage(page, true);
       }
     }
@@ -110,6 +112,7 @@ export class DialogueBox {
     this.root.classList.remove('show');
     // 마지막 클릭/키가 바로 다음 대화를 시작하지 않도록 한 박자 늦게 닫음
     this.closeTimer = window.setTimeout(() => (this.isOpen = false), 150);
+    return picked;
   }
 
   private showPage(text: string, waitForClick: boolean) {

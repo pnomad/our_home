@@ -20,6 +20,10 @@ export interface EventContext {
   setNameTags(visible: boolean): void;
   /** 다음 날 아침으로 넘기고 날짜를 돌려줌 */
   nextDay(): number;
+  /** 지금 노는 사람 이름 (뚱땡이 · 뚱순이) */
+  playerName: string;
+  /** 거실 라디오 켜고 끄기 */
+  setRadio?(on: boolean): void;
 }
 
 export const NARRATOR: Speaker = { name: '', order: '', color: '' };

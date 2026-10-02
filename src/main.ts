@@ -5,7 +5,7 @@ import { preloadModels } from './entities/modelStyle';
 import { createPlayerCharacter, createVillager, styleFromUrl, PLAYER_NAMES, type PlayerId, type VillagerId } from './entities/styles';
 import { choosePlayer } from './ui/chooser';
 import { Villager, turnToward, type World } from './entities/villager';
-import { VILLAGERS, greetingFor, fillNames, pick, type Talk, type MemoryTalkKind } from './data/villagers';
+import { VILLAGERS, greetingFor, fillNames, pick, type Talk, type MemoryTalkKind, type SockStory } from './data/villagers';
 import { createLife, nowMinutes, sunStrength } from './entities/life';
 import { DialogueBox, createActionButton } from './ui/dialogue';
 import { createFade } from './ui/fade';
@@ -20,6 +20,8 @@ import { getMoveInput } from './input';
 import { createRadioMusic } from './world/radioMusic';
 import { runBirdVisit } from './events/birdVisit';
 import { runSockStory, takeOffSocks } from './events/sockStory';
+import { runSockPair, runSockFashion } from './events/sockAfternoon';
+import { runSockWash } from './events/sockWash';
 import { createBall } from './world/ball';
 import { BIRD_KINDS, type BirdKind } from './entities/birds';
 
@@ -169,36 +171,50 @@ function startBird(kind: BirdKind) {
   }, kind).catch((e) => console.error(e)).finally(() => (birdBusy = false));
 }
 
-// ---------- 🧦 4일째 점심 전 양말 소동 (한 번만) ----------
-// 테스트용: ?story=sock 이면 아무 날이나 바로
-const SOCK_KEY = 'our-house:sock-done';
+// ---------- 🧦 양말 이야기 (각각 한 번만) ----------
+// 4일째 점심 전 소동 → 오후 짝 잃은 양말 → 해 질 녘 패션쇼 → 5일째 아침 빨래. 앞 이야기를 봐야 다음 이야기가 나옴
+// 테스트용: ?story=sock | sockpair | fashion | sockwash 면 아무 날이나 그 이야기를 바로
+const SOCK_STORIES: { id: SockStory; day: number; from: number; to: number; after?: SockStory; run: (ctx: EventContext) => Promise<void> }[] = [
+  { id: 'sock', day: 4, from: 9 * 60 + 20, to: 12 * 60, run: runSockStory },
+  { id: 'sockpair', day: 4, from: 13 * 60, to: 17 * 60, after: 'sock', run: runSockPair },
+  { id: 'fashion', day: 4, from: 17 * 60, to: 20 * 60 + 30, after: 'sockpair', run: runSockFashion },
+  { id: 'sockwash', day: 5, from: 9 * 60 + 20, to: 12 * 60, after: 'sock', run: runSockWash },
+];
 const storyParam = new URLSearchParams(location.search).get('story');
+let storyParamUsed = false;
 let sockBusy = false;
-let sockDay = -1; // 양말 소동이 있었던 날 (그날은 양말 이야기)
+let sockTalk: { story: SockStory; day: number } | null = null; // 오늘 본 양말 이야기 (그날은 그 이야기)
 const heardSock = new Set<VillagerId>();
-function sockDone() {
+const sockKey = (id: SockStory) => `our-house:${id}-done`;
+const sockSeenNow = new Set<SockStory>();
+function sockSeen(id: SockStory) {
+  if (sockSeenNow.has(id)) return true;
   try {
-    return localStorage.getItem(SOCK_KEY) === '1';
+    return localStorage.getItem(sockKey(id)) === '1';
   } catch {
     return false;
   }
 }
 function checkSock() {
-  if (sockBusy || birdBusy || cutscene || dialogue.isOpen || sockDay >= 0) return;
-  const due = storyParam === 'sock' || (clock.day === 4 && clock.minutes >= 9 * 60 + 20 && clock.minutes < 12 * 60 && !sockDone());
-  if (!due) return;
+  if (sockBusy || birdBusy || cutscene || dialogue.isOpen) return;
+  const forced = !storyParamUsed && SOCK_STORIES.find((s) => s.id === storyParam);
+  const story = forced || SOCK_STORIES.find((s) => clock.day === s.day && clock.minutes >= s.from && clock.minutes < s.to
+    && !sockSeen(s.id) && (!s.after || sockSeen(s.after)));
+  if (!story) return;
+  storyParamUsed = true;
   sockBusy = true;
   cutscene = true;
   actionButton.show(null);
-  runSockStory(eventContext()).catch((e) => console.error(e)).finally(() => {
+  story.run(eventContext()).catch((e) => console.error(e)).finally(() => {
     sockBusy = false;
     cutscene = false;
-    sockDay = clock.day;
+    sockTalk = { story: story.id, day: clock.day };
+    sockSeenNow.add(story.id);
     heardSock.clear();
     try {
-      localStorage.setItem(SOCK_KEY, '1');
+      localStorage.setItem(sockKey(story.id), '1');
     } catch {
-      // 저장이 막힌 브라우저면 그냥 넘어감
+      // 저장이 막힌 브라우저면 이번 판에서만 기억
     }
   });
 }
@@ -267,9 +283,9 @@ function nextTalk(v: Villager): { talk: Talk; friend?: string } {
   }
   if (v.drying) return { talk: v.info.drying };
   if (v.activity === 'dance') return { talk: v.info.dance };
-  if (sockDay === clock.day && !heardSock.has(v.info.id)) {
+  if (sockTalk && sockTalk.day === clock.day && !heardSock.has(v.info.id)) {
     heardSock.add(v.info.id);
-    return { talk: v.info.afterSock };
+    return { talk: v.info.afterSock[sockTalk.story] };
   }
   if (v.activity === 'ball') return { talk: v.info.ball };
   if (v.activity === 'read' && v.info.reading) return { talk: v.info.reading };
@@ -442,6 +458,8 @@ function eventContext(): EventContext {
       lighting.setTime(clock.minutes);
       return day;
     },
+    playerName: PLAYER_NAMES[who],
+    setRadio,
   };
 }
 
